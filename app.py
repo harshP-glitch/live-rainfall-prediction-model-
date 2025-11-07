@@ -10,7 +10,7 @@ Original file is located at
 # 🌧️ Rainfall Prediction Dashboard using LSTM
 # ------------------------------------------------------
 # Developed for Streamlit Cloud Deployment
-# By: [Your Name]
+# By: [Harshit Pant ]
 # ------------------------------------------------------
 
 import streamlit as st
@@ -50,7 +50,7 @@ model, feature_scaler, target_scaler = load_model_and_scalers()
 # 🌍 WEATHER API CONFIGURATION
 # ------------------------------------------------------
 try:
-    API_KEY = st.secrets["weather"]["api_key"]
+    API_KEY = st.secrets["weather"]["f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&hourly=rain,humidity,clouds,windspeed&current_weather=true"]
 except Exception:
     st.warning("⚠️ Add your OpenWeatherMap API key in Streamlit Secrets as `[weather]\napi_key = \"YOUR_KEY\"`")
     API_KEY = None
