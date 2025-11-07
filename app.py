@@ -49,37 +49,56 @@ model, feature_scaler, target_scaler = load_model_and_scalers()
 # ------------------------------------------------------
 # 🌍 WEATHER API CONFIGURATION
 # ------------------------------------------------------
-try:
-    API_KEY = st.secrets["weather"]["f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&hourly=rain,humidity,clouds,windspeed&current_weather=true"]
-except Exception:
-    st.warning("⚠️ Add your OpenWeatherMap API key in Streamlit Secrets as `[weather]\napi_key = \"YOUR_KEY\"`")
-    API_KEY = None
+# 🌍 WEATHER API CONFIGURATION (Open-Meteo)
+import requests
 
-DEFAULT_CITY = "Delhi,IN"
+DEFAULT_CITY = "Mohali,IN"
+
+# Optional: pre-defined coordinates for Indian cities
+CITY_COORDS = {
+    "Delhi,IN": (28.6139, 77.2090),
+    "Mohali,IN": (30.7046, 76.7179),
+    "Mumbai,IN": (19.0760, 72.8777),
+    "Bengaluru,IN": (12.9716, 77.5946),
+    "Chennai,IN": (13.0827, 80.2707),
+    "Kolkata,IN": (22.5726, 88.3639)
+}
 
 def fetch_live_weather(city: str):
-    """Fetch current weather data from OpenWeatherMap API"""
-    if API_KEY is None:
-        return None
+    """Fetch live weather data using Open-Meteo API (no key required)."""
+    lat, lon = CITY_COORDS.get(city, (30.7046, 76.7179))  # default Mohali
+
+    url = (
+        f"https://api.open-meteo.com/v1/forecast?"
+        f"latitude={lat}&longitude={lon}"
+        f"&current_weather=true"
+        f"&hourly=rain,relative_humidity_2m,cloudcover,wind_speed_10m"
+    )
+
     try:
-        url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={API_KEY}&units=metric"
-        res = requests.get(url)
-        data = res.json()
-        if "main" not in data:
-            st.error(f"API Error: {data}")
+        response = requests.get(url)
+        data = response.json()
+
+        if "current_weather" not in data:
+            st.error(f"API response missing expected keys: {data}")
             return None
+
+        current = data["current_weather"]
+        humidity = data["hourly"]["relative_humidity_2m"][0] if "hourly" in data else 60
+        cloud = data["hourly"]["cloudcover"][0] if "hourly" in data else 40
+
         return {
             "date": dt.datetime.now(),
-            "temparature": data["main"]["temp"],
-            "humidity": data["main"]["humidity"],
-            "windspeed": data["wind"]["speed"],
-            "winddirection": data["wind"]["deg"],
-            "cloud": data["clouds"]["all"],
+            "temparature": current["temperature"],
+            "humidity": humidity,
+            "windspeed": current["windspeed"],
+            "winddirection": current["winddirection"],
+            "cloud": cloud,
         }
-    except Exception as e:
-        st.error(f"Error fetching weather data: {e}")
-        return None
 
+    except Exception as e:
+        st.error(f"Error fetching from Open-Meteo API: {e}")
+        return None
 def predict_rainfall(live_data: dict):
     """Make rainfall prediction using trained LSTM model"""
     df_live = pd.DataFrame([live_data])
