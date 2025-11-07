@@ -38,7 +38,7 @@ st.set_page_config(
 @st.cache_resource
 @st.cache_resource
 def load_model_and_scalers():
-    model = load_model("rainfall_lstm_model.h5")
+    model = load_model("rainfall.h5")
     feature_scaler = joblib.load("feature_scaler.pkl")
     target_scaler = joblib.load("target_scaler.pkl")
     return model, feature_scaler, target_scaler
