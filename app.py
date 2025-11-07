@@ -100,13 +100,48 @@ def fetch_live_weather(city: str):
         st.error(f"Error fetching from Open-Meteo API: {e}")
         return None
 def predict_rainfall(live_data: dict):
-    """Make rainfall prediction using trained LSTM model"""
+    """Make rainfall prediction using trained LSTM model with feature name auto-alignment."""
     df_live = pd.DataFrame([live_data])
-    X_live = df_live[["humidity", "windspeed", "temparature", "cloud"]]
+
+    # Add time-based features if the model used them
+    df_live["dayofweek"] = dt.datetime.now().weekday()
+    df_live["month"] = dt.datetime.now().month
+
+    try:
+        # If scaler has stored feature names, use them
+        expected_features = list(feature_scaler.feature_names_in_)
+        # Auto-create missing engineered features
+        for feat in expected_features:
+            if feat not in df_live.columns:
+                if "humidity" in feat:
+                    df_live[feat] = df_live["humidity"].values[0]
+                elif "cloud" in feat:
+                    df_live[feat] = df_live["cloud"].values[0]
+                elif "wind" in feat:
+                    df_live[feat] = df_live["windspeed"].values[0]
+                elif "temp" in feat:
+                    df_live[feat] = df_live["temparature"].values[0]
+                elif "day" in feat:
+                    df_live[feat] = df_live["dayofweek"].values[0]
+                elif "month" in feat:
+                    df_live[feat] = df_live["month"].values[0]
+                else:
+                    df_live[feat] = 0  # safe default for unknown features
+
+        # Match the exact order expected by the scaler
+        X_live = df_live[expected_features]
+
+    except AttributeError:
+        # Fallback if scaler has no feature name tracking
+        X_live = df_live.select_dtypes(include=[np.number])
+
+    # Transform safely
     X_scaled = feature_scaler.transform(X_live)
     X_scaled = X_scaled.reshape((1, X_scaled.shape[1], 1))
+
     y_pred = model.predict(X_scaled)
     return float(target_scaler.inverse_transform(y_pred)[0][0])
+
 
 # ------------------------------------------------------
 # 📊 LOAD HISTORICAL DATA
