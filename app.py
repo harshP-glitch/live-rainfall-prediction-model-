@@ -190,13 +190,16 @@ def predict_rainfall(live_data: dict):
     X_live = df_live[expected_features].astype(float)
     X_scaled = feature_scaler.transform(X_live)
     
+    # ... inside predict_rainfall function ...
+    
     # --- CORRECTED RESHAPE ---
     X_scaled = np.array(X_scaled).reshape((1, 1, X_scaled.shape[1]))
 
     # --- ADD THIS DEBUG LINE ---
     st.write(f"DEBUG: Shape being passed to model: {X_scaled.shape}")
 
-    y_pred = model.predict(X_scaled)
+    # This is the line that errors
+    y_pred = model.predict(X_scaled) 
     y_inv = target_scaler.inverse_transform(y_pred.reshape(-1, 1)).flatten()
 
 # ---------------- LOAD HISTORICAL DATA ----------------
@@ -318,13 +321,14 @@ with tab1:
 # ---------------- TAB 2: Model Evaluation ----------------
 with tab2:
     st.subheader("Model Evaluation Metrics (from training)")
-    mae, mse, r2 = 0.312, 0.248, 0.917
-    col1, col2, col3 = st.columns(3)
-    col1.metric("📉 MAE", f"{mae:.3f}")
-    col2.metric("📈 MSE", f"{mse:.3f}")
-    col3.metric("🔢 R² Score", f"{r2:.3f}")
-    st.info("Placeholder values — replace with your model evaluation metrics if available.")
 
+    # --- ADD THIS LINE ---
+    if model:
+        st.write("### Model Summary (for debugging input shape)")
+        st.text(model.summary()) # This will print the model summary
+
+    mae, mse, r2 = 0.312, 0.248, 0.917
+# ...
 # ---------------- TAB 3: Historical Trends ----------------
 with tab3:
     st.subheader("Historical Weather / Rainfall Trends")
