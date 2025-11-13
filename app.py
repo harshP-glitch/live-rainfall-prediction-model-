@@ -56,23 +56,53 @@ DEFAULT_CITY = "Mohali,IN"
 
 # Optional: pre-defined coordinates for Indian cities
 CITY_COORDS = {
-    "Delhi,IN": (28.6139, 77.2090),
-    "Mohali,IN": (30.7046, 76.7179),
-    "Mumbai,IN": (19.0760, 72.8777),
-    "Bengaluru,IN": (12.9716, 77.5946),
-    "Chennai,IN": (13.0827, 80.2707),
-    "Kolkata,IN": (22.5726, 88.3639)
+    # ---------------- CITY SELECTION FOR INDIA ----------------
+
+CITY_COORDS = {
+    "Delhi": (28.6139, 77.2090),
+    "Mumbai": (19.0760, 72.8777),
+    "Kolkata": (22.5726, 88.3639),
+    "Chennai": (13.0827, 80.2707),
+    "Bengaluru": (12.9716, 77.5946),
+    "Hyderabad": (17.3850, 78.4867),
+    "Pune": (18.5204, 73.8567),
+    "Ahmedabad": (23.0225, 72.5714),
+    "Jaipur": (26.9124, 75.7873),
+    "Surat": (21.1702, 72.8311),
+    "Lucknow": (26.8467, 80.9462),
+    "Kanpur": (26.4499, 80.3319),
+    "Nagpur": (21.1458, 79.0882),
+    "Indore": (22.7196, 75.8577),
+    "Bhopal": (23.2599, 77.4126),
+    "Patna": (25.5941, 85.1376),
+    "Vadodara": (22.3072, 73.1812),
+    "Ludhiana": (30.9000, 75.8573),
+    "Agra": (27.1767, 78.0081),
+    "Varanasi": (25.3176, 82.9739),
+    "Amritsar": (31.6340, 74.8723),
+    "Ranchi": (23.3441, 85.3096),
+    "Guwahati": (26.1445, 91.7362),
+    "Kochi": (9.9312, 76.2673),
+    "Thiruvananthapuram": (8.5241, 76.9366),
+    "Coimbatore": (11.0168, 76.9558),
+    "Mysuru": (12.2958, 76.6394),
+    "Noida": (28.5355, 77.3910),
+    "Gurgaon": (28.4595, 77.0266),
+    "Ghaziabad": (28.6692, 77.4538),
+    "Mohali": (30.7046, 76.7179),
+    "Chandigarh": (30.7333, 76.7794)
 }
 
-def fetch_live_weather(city: str):
-    """Fetch live weather data using Open-Meteo API (no key required)."""
-    lat, lon = CITY_COORDS.get(city, (30.7046, 76.7179))  # default Mohali
+}
+
+def fetch_live_weather(city):
+    """Fetch live weather using Open-Meteo API."""
+    lat, lon = CITY_COORDS[city]
 
     url = (
         f"https://api.open-meteo.com/v1/forecast?"
-        f"latitude={lat}&longitude={lon}"
-        f"&current_weather=true"
-        f"&hourly=rain,relative_humidity_2m,cloudcover,wind_speed_10m"
+        f"latitude={lat}&longitude={lon}&current_weather=true&"
+        "hourly=rain,relative_humidity_2m,cloudcover,wind_speed_10m"
     )
 
     try:
@@ -165,11 +195,17 @@ pdf = load_historical_data()
 # 🧭 SIDEBAR CONTROLS
 # ------------------------------------------------------
 st.sidebar.header("⚙️ Dashboard Controls")
-city = st.sidebar.text_input("Enter City Name", DEFAULT_CITY)
+
+city_selected = st.sidebar.selectbox(
+    "Select City (India)",
+    list(CITY_COORDS.keys()),
+    index=list(CITY_COORDS.keys()).index("Mohali")  # default
+)
+
 auto_refresh = st.sidebar.checkbox("Auto-refresh Predictions", value=False)
 refresh_rate = st.sidebar.slider("Refresh Interval (seconds)", 30, 300, 60)
-st.sidebar.markdown("---")
-st.sidebar.info("Uses OpenWeatherMap for real-time weather data")
+
+st.sidebar.info("Live weather powered by Open-Meteo API")
 
 # ------------------------------------------------------
 # 🌧️ MAIN DASHBOARD UI
@@ -301,37 +337,44 @@ with tab4:
 st.markdown("---")
 st.caption("Developed by [Your Name] • Powered by OpenWeatherMap API • Model: LSTM Neural Network")
 # ---------------------- FREE CHATBOT (HuggingFace) -----------------------
-from huggingface_hub import InferenceClient
+import requests
+import streamlit as st
 
-def load_hf_client():
+HF_API_URL = "https://api-inference.huggingface.co/models/google/flan-t5-small"
+HF_API_KEY = st.secrets["hf"]["api_key"]
+
+headers = {"Authorization": f"Bearer {HF_API_KEY}"}
+
+def ask_chatbot(prompt):
+    """Free weather chatbot using HuggingFace API"""
+    data = {"inputs": prompt}
+    response = requests.post(HF_API_URL, headers=headers, json=data)
     try:
-        api_key = st.secrets["hf"]["api_key"]
-        return InferenceClient(model="google/flan-t5-large", token=api_key)
+        return response.json()[0]["generated_text"]
     except:
-        st.warning("⚠️ Add your HuggingFace API key in Streamlit Secrets.")
-        return None
+        return "Sorry, the chatbot is currently busy. Try again in a few seconds."
 
-hf_client = load_hf_client()
 
-def ask_free_chatbot(prompt):
-    if hf_client is None:
-        return "Chatbot unavailable (missing HF API key)."
+# ---------------- CHATBOT UI ----------------
 
-    # T5 models work like text → text generation
-    query = (
-        "You are a weather assistant. "
-        "Answer only questions related to weather, climate, rainfall, storms, "
-        "agriculture advice, seasons, humidity, temperature. "
-        "If question is unrelated, politely refuse. "
-        f"User question: {prompt}"
-    )
+st.subheader("🌤️ Weather Chatbot")
 
-    try:
-        output = hf_client.text_generation(
-            query,
-            max_new_tokens=120,
-            temperature=0.7
-        )
-        return output
-    except Exception as e:
-        return f"Error from model: {e}"
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
+
+user_msg = st.text_input("Ask me anything about weather:")
+
+if user_msg:
+    full_prompt = f"User question about weather: {user_msg}. Respond simply, clearly, and as a weather expert."
+
+    bot_reply = ask_chatbot(full_prompt)
+
+    st.session_state.chat_history.append(("You", user_msg))
+    st.session_state.chat_history.append(("Bot", bot_reply))
+
+# Show chat
+for sender, msg in st.session_state.chat_history:
+    if sender == "You":
+        st.markdown(f"**🧑‍💬 You:** {msg}")
+    else:
+        st.markdown(f"**🤖 Bot:** {msg}")
