@@ -269,43 +269,35 @@ with tab3:
 # -------------------- FOOTER --------------------
 st.markdown("---")
 st.caption("Developed by [Your Name] • Powered by OpenWeatherMap API • Model: LSTM Neural Network")
-# =====================================
-# 🤖 Lightweight Weather Chatbot (Cloud Safe)
-# =====================================
-from transformers import pipeline
+import streamlit as st
+import openai
 
-@st.cache_resource
-def load_chatbot():
-    """Load a lightweight transformer for Q&A"""
-    return pipeline("text2text-generation", model="google/flan-t5-small")
+openai.api_key = st.secrets["openai"]["api_key"]
 
-chatbot = load_chatbot()
+
+openai.api_key = st.secrets["openai"]["api_key"]
+
+def chat_with_openai(messages):
+    response = openai.ChatCompletion.create(
+        model="gpt-3.5-turbo",
+        messages=messages
+    )
+    return response["choices"][0]["message"]["content"]
+st.header("🤖 Weather Assistant (AI-powered)")
 
 if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
+    st.session_state.chat_history = [
+        {"role": "system", "content": "You are a weather expert. Answer only weather-related questions."}
+    ]
 
-st.markdown("## 🌤️ Smart Weather Chatbot")
+user_message = st.chat_input("Ask anything about weather...")
 
-user_input = st.chat_input("Ask about weather, rainfall, or farming...")
+if user_message:
+    st.session_state.chat_history.append({"role": "user", "content": user_message})
+    bot_response = chat_with_openai(st.session_state.chat_history)
+    st.session_state.chat_history.append({"role": "assistant", "content": bot_response})
 
-if user_input:
-    st.session_state.chat_history.append(("👤", user_input))
-    
-    # Weather-aware response logic
-    if any(w in user_input.lower() for w in ["rain", "forecast", "rainfall"]):
-        city = st.session_state.get("city", "Mohali,IN")
-        weather = fetch_live_weather(city)
-        if weather:
-            rainfall_pred = predict_rainfall(weather)
-            summary = f"In {city}, predicted rainfall is {rainfall_pred:.2f} mm with humidity {weather['humidity']}% and temperature {weather['temparature']}°C."
-            bot_reply = chatbot(f"{summary} Explain what this means for agriculture.", max_length=100)[0]["generated_text"]
-        else:
-            bot_reply = "Sorry, I couldn't fetch live weather data."
-    else:
-        bot_reply = chatbot(user_input, max_length=80)[0]["generated_text"]
+for msg in st.session_state.chat_history[1:]:
+    speaker = "🧑‍🌾 User" if msg["role"] == "user" else "🤖 AI"
+    st.write(f"**{speaker}:** {msg['content']}")
 
-    st.session_state.chat_history.append(("🤖", bot_reply))
-
-# Display chat history
-for role, msg in st.session_state.chat_history:
-    st.markdown(f"**{role}:** {msg}")
