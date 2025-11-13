@@ -203,7 +203,7 @@ tab1, tab2, tab3, tab4 = st.tabs(["📈 Live Predictions", "📊 Model Evaluatio
 # ---------------- TAB 1: Live Predictions ----------------
 with tab1:
     st.subheader("Live Weather & Predicted Rainfall")
-        # -------------- LIVE PREDICTION LOOP ---------------
+    # -------------- LIVE PREDICTION LOOP ---------------
     if "history" not in st.session_state:
         st.session_state["history"] = pd.DataFrame(
             columns=["date", "predicted_rainfall", "humidity", "temparature", "windspeed", "city"]
