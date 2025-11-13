@@ -301,7 +301,7 @@ st.dataframe(
         .sort_values(by="date", ascending=False)
         .head(10)
     )
-    else:
+     else:
         st.warning("Could not fetch live weather at the moment. Try again later.")
 
 # Manual refresh button
