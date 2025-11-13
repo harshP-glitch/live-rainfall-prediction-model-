@@ -266,9 +266,9 @@ new_entry = {
         }
 
         # Update session history
-        st.session_state["history"] = pd.concat(
-            [st.session_state["history"], pd.DataFrame([new_entry])],
-            ignore_index=True
+st.session_state["history"] = pd.concat(
+[st.session_state["history"], pd.DataFrame([new_entry])],
+ignore_index=True
         )
 
         # --- METRICS ---
