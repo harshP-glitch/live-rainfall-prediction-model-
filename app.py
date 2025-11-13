@@ -296,7 +296,7 @@ fig.update_layout(
 st.plotly_chart(fig, use_container_width=True)
 
 # --- Recent Table ---
-    st.dataframe(
+st.dataframe(
         st.session_state["history"]
         .sort_values(by="date", ascending=False)
         .head(10)
