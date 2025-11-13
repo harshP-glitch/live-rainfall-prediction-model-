@@ -8,4 +8,4 @@ keras
 scikit-learn
 Joblib
 plotly
-openai
+huggingface_hub
