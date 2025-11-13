@@ -203,69 +203,72 @@ tab1, tab2, tab3, tab4 = st.tabs(["📈 Live Predictions", "📊 Model Evaluatio
 # ---------------- TAB 1: Live Predictions ----------------
 with tab1:
     st.subheader("Live Weather & Predicted Rainfall")
+        # -------------- LIVE PREDICTION LOOP ---------------
     if "history" not in st.session_state:
-        st.session_state["history"] = pd.DataFrame(columns=["date", "predicted_rainfall", "humidity", "temparature", "windspeed", "city"])
-
-    col_refresh, col_info = st.columns([1, 4])
-    with col_refresh:
-        if st.button("🔄 Refresh Now"):
-            st.session_state["_refresh_ts"] = time.time()
-            # no rerun call; the button press itself triggers rerun
-
-    with col_info:
-        st.write(f"Showing data for: **{city_selected}** • Auto-refresh = {auto_refresh}")
-
-    live_data = fetch_live_weather(city_selected)
-
-    if live_data:
-        rainfall_pred = predict_rainfall(live_data)
-        if rainfall_pred is None:
-            st.warning("Prediction unavailable (model or scalers missing). Showing live weather only.")
-        else:
-            st.success(f"Predicted rainfall: {rainfall_pred:.3f} mm")
-
-        new_entry = {
-            "date": live_data["date"],
-            "predicted_rainfall": rainfall_pred if rainfall_pred is not None else np.nan,
-            "humidity": live_data["humidity"],
-            "temparature": live_data["temparature"],
-            "windspeed": live_data["windspeed"],
-            "city": city_selected
-        }
-        st.session_state["history"] = pd.concat([st.session_state["history"], pd.DataFrame([new_entry])], ignore_index=True)
-
-        col1, col2, col3 = st.columns(3)
-        if rainfall_pred is not None and live_data is not None:
-            col1.metric("🌧️ Predicted Rainfall (mm)", f"{rainfall_pred:.2f}")
-            col2.metric("💧 Humidity (%)", f"{live_data['humidity']}")
-            col3.metric("🌡️ Temperature (°C)", f"{live_data['temparature']:.1f}")
-        else:
-            col1.metric("🌧️ Predicted Rainfall (mm)", "N/A")
-            col2.metric("💧 Humidity (%)", "N/A")
-            col3.metric("🌡️ Temperature (°C)", "N/A")
-
-        hist_df = st.session_state["history"].tail(30)
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(
-            x=hist_df["date"],
-            y=hist_df["predicted_rainfall"],
-            mode="lines+markers",
-            name="Predicted Rainfall"
-        ))
-        fig.update_layout(
-            title="Predicted Rainfall Over Time",
-            xaxis_title="Timestamp",
-            yaxis_title="Rainfall (mm)",
-            template="plotly_white"
+        st.session_state["history"] = pd.DataFrame(
+            columns=["date", "predicted_rainfall", "humidity", "temparature", "windspeed", "city"]
         )
-        st.plotly_chart(fig, width="stretch")
 
-        # Correct indentation HERE
-        st.dataframe(
-            st.session_state["history"]
-            .sort_values(by="date", ascending=False)
-            .head(10)
-        )
+    placeholder = st.empty()
+
+    while True:
+        live_data = fetch_live_weather(city_selected)
+
+        with placeholder.container():
+            if live_data:
+                rainfall_pred = predict_rainfall(live_data)
+
+                new_entry = {
+                    "date": live_data["date"],
+                    "predicted_rainfall": rainfall_pred,
+                    "humidity": live_data["humidity"],
+                    "temparature": live_data["temparature"],
+                    "windspeed": live_data["windspeed"],
+                    "city": city_selected
+                }
+
+                st.session_state["history"] = pd.concat(
+                    [st.session_state["history"], pd.DataFrame([new_entry])],
+                    ignore_index=True
+                )
+
+                # --- METRICS ---
+                col1, col2, col3 = st.columns(3)
+                col1.metric("🌧️ Predicted Rainfall (mm)", f"{rainfall_pred:.2f}")
+                col2.metric("💧 Humidity (%)", f"{live_data['humidity']}")
+                col3.metric("🌡️ Temperature (°C)", f"{live_data['temparature']:.1f}")
+
+                # --- CHART ---
+                hist_df = st.session_state["history"].tail(30)
+
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(
+                    x=hist_df["date"],
+                    y=hist_df["predicted_rainfall"],
+                    mode="lines+markers",
+                    name="Predicted Rainfall"
+                ))
+                fig.update_layout(
+                    title="Predicted Rainfall Over Time",
+                    xaxis_title="Timestamp",
+                    yaxis_title="Rainfall (mm)",
+                    template="plotly_white"
+                )
+                st.plotly_chart(fig, use_container_width=True)
+
+                # --- RECENT TABLE ---
+                st.dataframe(
+                    st.session_state["history"]
+                    .sort_values(by="date", ascending=False)
+                    .head(10)
+                )
+
+        # Stop refreshing if checkbox unchecked
+        if not auto_refresh:
+            break
+
+        time.sleep(refresh_rate)
+
 # ---------------- TAB 2: Model Evaluation ----------------
 with tab2:
     st.subheader("Model Evaluation Metrics (from training)")
