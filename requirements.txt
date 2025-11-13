@@ -9,3 +9,4 @@ scikit-learn
 Joblib
 plotly
 huggingface_hub
+requests
