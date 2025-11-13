@@ -8,3 +8,7 @@ keras
 scikit-learn
 Joblib
 plotly
+requests
+transformers==4.42.0
+torch==2.3.0
+sentencepiece
