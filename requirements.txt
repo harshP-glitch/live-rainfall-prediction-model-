@@ -8,4 +8,6 @@ keras
 scikit-learn
 Joblib
 plotly
-pip install transformers torch sentencepiece
+transformers
+torch
+sentencepiece
