@@ -269,94 +269,61 @@ with tab3:
 # -------------------- FOOTER --------------------
 st.markdown("---")
 st.caption("Developed by [Your Name] • Powered by OpenWeatherMap API • Model: LSTM Neural Network")
-# ------------------------------------------------------
-# 💬 OFFLINE CONVERSATIONAL WEATHER CHATBOT (NO API KEY)
-# ------------------------------------------------------
-
-from transformers import AutoModelForCausalLM, AutoTokenizer
+# =====================================
+# 🤖 Weather Conversational Chatbot
+# =====================================
 import torch
+from transformers import AutoTokenizer, AutoModelForCausalLM
 
-st.markdown("## 🤖 Offline Smart Weather Chat Assistant")
+@st.cache_resource
+def load_llm():
+    model_name = "microsoft/DialoGPT-small"   # lightweight conversational model
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model = AutoModelForCausalLM.from_pretrained(model_name)
+    return tokenizer, model
 
-# Initialize chat history
+tokenizer, model = load_llm()
+
+st.markdown("## 🌤️ Smart Weather Chatbot")
+
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 
-# Load small open-source conversational model (runs on CPU)
-@st.cache_resource
-def load_local_llm():
-    tokenizer = AutoTokenizer.from_pretrained("microsoft/DialoGPT-medium")
-    model = AutoModelForCausalLM.from_pretrained("microsoft/DialoGPT-medium")
-    return tokenizer, model
-
-tokenizer, model = load_local_llm()
-
-# Helper: Generate conversational response from local model
-def local_llm_response(prompt, past=None):
-    """Generate a conversational reply using offline LLM with chat history"""
-    # Combine chat history into one long context string
+def local_llm_response(prompt):
+    """Generate a conversational reply using the offline LLM with context memory."""
     history = " ".join([msg for role, msg in st.session_state.chat_history])
-
-    # Add the new prompt to the context
-    combined_input = history + " " + prompt + tokenizer.eos_token
-
-    # Tokenize and encode
-    inputs = tokenizer.encode(combined_input, return_tensors="pt")
-
-    # Generate model response
+    inputs = tokenizer.encode(history + prompt + tokenizer.eos_token, return_tensors="pt")
     outputs = model.generate(
         inputs,
-        max_length=250,
+        max_length=200,
         pad_token_id=tokenizer.eos_token_id,
         temperature=0.8,
         top_p=0.9,
         do_sample=True
     )
-
-    # Decode and clean up reply
     reply = tokenizer.decode(outputs[:, inputs.shape[-1]:][0], skip_special_tokens=True)
     return reply
 
-# Logic: Combine LSTM model + Offline LLM
-def generate_weather_response(query):
-    q = query.lower()
-
-    # 1️⃣ Predictive queries (your own LSTM model)
-    if any(w in q for w in ["rain", "forecast", "rainfall", "today", "tomorrow"]):
-        city = st.session_state.get("city", "Mohali,IN")
-        live_weather = fetch_live_weather(city)
-        if live_weather:
-            pred = predict_rainfall(live_weather)
-            if pred < 0.5:
-                return f"☁️ No significant rainfall expected today in {city}. Predicted: {pred:.2f} mm."
-            elif pred < 2:
-                return f"🌦️ Light rainfall expected in {city}. Predicted: {pred:.2f} mm."
-            else:
-                return f"🌧️ Heavy rainfall likely in {city}! Predicted: {pred:.2f} mm."
-        else:
-            return "⚠️ Unable to fetch live weather data for prediction."
-
-    # 2️⃣ Informational or conceptual weather queries
-    elif any(w in q for w in ["humidity", "cloud", "temperature", "wind", "storm", "climate", "pressure"]):
-        return local_llm_response(f"Explain in simple terms: {query}")
-
-    # 3️⃣ General conversation
-    elif any(w in q for w in ["hello", "hi", "how are you", "hey"]):
-        return "👋 Hello! I’m your weather assistant. Ask me about rainfall, storms, or weather predictions."
-
-    # 4️⃣ Default fallback
-    else:
-        return local_llm_response(f"Weather chat context: {query}")
-
-# --- Chat interface ---
-user_input = st.chat_input("Ask anything about the weather...")
+# --- Chat Interface ---
+user_input = st.chat_input("Ask me anything about the weather, rainfall, or climate...")
 
 if user_input:
-    st.session_state.chat_history.append(("🧑‍🌾 You", user_input))
-    response = generate_weather_response(user_input)
-    st.session_state.chat_history.append(("🤖 Bot", response))
+    st.session_state.chat_history.append(("👤", user_input))
+    # Combine your model with chatbot logic
+    if any(w in user_input.lower() for w in ["rain", "forecast", "rainfall"]):
+        city = st.session_state.get("city", "Mohali,IN")
+        weather = fetch_live_weather(city)
+        if weather:
+            rainfall_pred = predict_rainfall(weather)
+            summary = f"In {city}, predicted rainfall is {rainfall_pred:.2f} mm."
+            bot_reply = local_llm_response(f"{summary} Also explain what this means for farmers.")
+        else:
+            bot_reply = "I couldn't get live weather data right now."
+    else:
+        bot_reply = local_llm_response(user_input)
 
-# Display conversation
+    st.session_state.chat_history.append(("🤖", bot_reply))
+
+# --- Display Chat ---
 for role, text in st.session_state.chat_history:
     st.markdown(f"**{role}:** {text}")
-
