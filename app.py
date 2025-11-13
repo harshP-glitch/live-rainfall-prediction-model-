@@ -246,15 +246,26 @@ with tab1:
 
         hist_df = st.session_state["history"].tail(30)
         fig = go.Figure()
-        fig.add_trace(go.Scatter(x=hist_df["date"], y=hist_df["predicted_rainfall"], mode="lines+markers", name="Predicted Rainfall"))
-        fig.update_layout(title="Predicted Rainfall Over Time", xaxis_title="Timestamp", yaxis_title="Rainfall (mm)", template="plotly_white")
-        # Streamlit expects width="stretch" (replace old use_container_width)
+        fig.add_trace(go.Scatter(
+            x=hist_df["date"],
+            y=hist_df["predicted_rainfall"],
+            mode="lines+markers",
+            name="Predicted Rainfall"
+        ))
+        fig.update_layout(
+            title="Predicted Rainfall Over Time",
+            xaxis_title="Timestamp",
+            yaxis_title="Rainfall (mm)",
+            template="plotly_white"
+        )
         st.plotly_chart(fig, width="stretch")
 
-        st.dataframe(st.session_state["history"].sort_values(by="date", ascending=False).head(10))
-    else:
-        st.warning("Could not fetch live weather for the selected city. Check network or city coordinates.")
-
+        # Correct indentation HERE
+        st.dataframe(
+            st.session_state["history"]
+            .sort_values(by="date", ascending=False)
+            .head(10)
+        )
 # ---------------- TAB 2: Model Evaluation ----------------
 with tab2:
     st.subheader("Model Evaluation Metrics (from training)")
