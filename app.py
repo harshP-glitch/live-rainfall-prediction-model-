@@ -19,6 +19,36 @@ st.set_page_config(page_title="Rainfall Prediction Dashboard",
                    layout="wide")
 
 # ---------------- CONSTANTS & CITY LIST ----------------
+def interpret_rainfall(mm):
+    """
+    Convert rainfall in mm into weather condition + farmer advice.
+    """
+    if mm < 0.5:
+        return (
+            "☀️ **Clear / No Rain Expected**",
+            "Good time for outdoor activities. Farmers can plan irrigation normally."
+        )
+    elif mm < 2.5:
+        return (
+            "🌤️ **Very Light Rain / Drizzle**",
+            "Beneficial for crops; mild moisture gain. No risk to harvesting or spraying."
+        )
+    elif mm < 7.5:
+        return (
+            "🌦️ **Light Rain**",
+            "Good for soil moisture. Farmers can reduce irrigation for the day."
+        )
+    elif mm < 35:
+        return (
+            "🌧️ **Moderate Rain**",
+            "May affect field activities. Avoid spraying pesticides or fertilizers."
+        )
+    else:
+        return (
+            "⛈️ **Heavy Rain / Storm Likely**",
+            "Farmers should protect newly sown crops and avoid field activities."
+        )
+
 CITY_COORDS = {
     "Delhi": (28.6139, 77.2090),
     "Mumbai": (19.0760, 72.8777),
@@ -219,6 +249,12 @@ with tab1:
 
     if live_data:
         rainfall_pred = predict_rainfall(live_data)
+      # Interpret predicted rainfall
+weather_text, farmer_advice = interpret_rainfall(rainfall_pred)
+
+# Display interpretation
+st.markdown(f"### {weather_text}")
+st.info(f"**Farmer Guidance:** {farmer_advice}")
 
         new_entry = {
             "date": live_data["date"],
