@@ -343,6 +343,7 @@ def ask_hf_chatbot(prompt_text):
     except Exception as e:
         return f"Chatbot error: {e}"
 
+# ---------------- TAB 4: Free HF Chatbot ----------------
 with tab4:
     st.subheader("💬 Free Weather Chatbot (HuggingFace Inference)")
     st.markdown("Ask weather-related questions. The bot will use the selected city context.")
@@ -350,19 +351,24 @@ with tab4:
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
 
-    user_query = st.text_input("Ask anything about the weather (example: Will it rain today?)")
+    # user input
+    user_query = st.text_input("Ask anything about the weather:")
 
-    if user_query:
+    # when user submits
+    if st.button("Send") and user_query:
         st.session_state.chat_history.append(("You", user_query))
-        # provide city context to the model so it can answer specifically
-        prompt = f"You are a helpful weather expert. The user is asking about {city_selected}. Question: {user_query} Provide a clear, concise answer relevant to weather and agriculture if appropriate."
+
+        # Add city context
+        prompt = (
+            f"You are a helpful weather expert. The user is asking about {city_selected}. "
+            f"Question: {user_query}. Answer clearly and concisely."
+        )
+
         reply = ask_hf_chatbot(prompt)
         st.session_state.chat_history.append(("Bot", reply))
-        # show the most recent message pair immediately
-        st.experimental_rerun()
 
-    # show chat history
-    for sender, text in st.session_state.chat_history[-20:]:
+    # Display chat
+    for sender, text in st.session_state.chat_history[-30:]:
         if sender == "You":
             st.markdown(f"**🧑‍🌾 You:** {text}")
         else:
@@ -370,7 +376,6 @@ with tab4:
 
     if st.button("🔄 Clear Chat"):
         st.session_state.chat_history = []
-
 
 # ---------------- FOOTER ----------------
 st.markdown("---")
