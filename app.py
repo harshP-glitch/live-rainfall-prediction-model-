@@ -296,14 +296,14 @@ fig.update_layout(
 st.plotly_chart(fig, use_container_width=True)
 
 # --- Recent Table ---
-st.dataframe(
-    st.session_state["history"]
-    .sort_values(by="date", ascending=False)
-    .head(10)
-)
+    st.dataframe(
+        st.session_state["history"]
+        .sort_values(by="date", ascending=False)
+        .head(10)
+    )
 
-    else:
-        st.warning("Could not fetch live weather at the moment. Try again later.")
+else:
+    st.warning("Could not fetch live weather at the moment. Try again later.")
 
 # Manual refresh button
 if st.button("🔄 Refresh Now"):
