@@ -182,7 +182,12 @@ st.markdown(
     """
 )
 
-tab1, tab2, tab3 = st.tabs(["📈 Live Predictions", "📊 Model Evaluation", "📉 Historical Trends"])
+tab1, tab2, tab3, tab4 = st.tabs([
+    "📈 Live Predictions", 
+    "📊 Model Evaluation", 
+    "📉 Historical Trends",
+    "💬 Weather Chatbot"
+])
 
 # -------------------- TAB 1: LIVE PREDICTIONS --------------------
 with tab1:
@@ -266,38 +271,67 @@ with tab3:
     else:
         st.warning("No historical dataset loaded.")
 
+with tab4:
+    st.subheader("💬 Free Weather Chatbot (HuggingFace)")
+
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = []
+
+    user_msg = st.text_input("Ask anything about weather:")
+
+    if user_msg:
+        st.session_state.chat_history.append(("user", user_msg))
+
+        bot_reply = ask_free_chatbot(user_msg)
+
+        st.session_state.chat_history.append(("bot", bot_reply))
+
+    # Display messages
+    for role, msg in st.session_state.chat_history:
+        if role == "user":
+            st.markdown(f"**🧑 You:** {msg}")
+        else:
+            st.markdown(f"**🤖 Bot:** {msg}")
+
+    if st.button("🔄 Clear Chat"):
+        st.session_state.chat_history = []
+
+
 # -------------------- FOOTER --------------------
 st.markdown("---")
 st.caption("Developed by [Your Name] • Powered by OpenWeatherMap API • Model: LSTM Neural Network")
-import streamlit as st
-import openai
+# ---------------------- FREE CHATBOT (HuggingFace) -----------------------
+from huggingface_hub import InferenceClient
 
-openai.api_key = st.secrets["openai"]["api_key"]
+def load_hf_client():
+    try:
+        api_key = st.secrets["hf"]["api_key"]
+        return InferenceClient(model="google/flan-t5-large", token=api_key)
+    except:
+        st.warning("⚠️ Add your HuggingFace API key in Streamlit Secrets.")
+        return None
 
+hf_client = load_hf_client()
 
-openai.api_key = st.secrets["openai"]["api_key"]
+def ask_free_chatbot(prompt):
+    if hf_client is None:
+        return "Chatbot unavailable (missing HF API key)."
 
-def chat_with_openai(messages):
-    response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",
-        messages=messages
+    # T5 models work like text → text generation
+    query = (
+        "You are a weather assistant. "
+        "Answer only questions related to weather, climate, rainfall, storms, "
+        "agriculture advice, seasons, humidity, temperature. "
+        "If question is unrelated, politely refuse. "
+        f"User question: {prompt}"
     )
-    return response["choices"][0]["message"]["content"]
-st.header("🤖 Weather Assistant (AI-powered)")
 
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = [
-        {"role": "system", "content": "You are a weather expert. Answer only weather-related questions."}
-    ]
-
-user_message = st.chat_input("Ask anything about weather...")
-
-if user_message:
-    st.session_state.chat_history.append({"role": "user", "content": user_message})
-    bot_response = chat_with_openai(st.session_state.chat_history)
-    st.session_state.chat_history.append({"role": "assistant", "content": bot_response})
-
-for msg in st.session_state.chat_history[1:]:
-    speaker = "🧑‍🌾 User" if msg["role"] == "user" else "🤖 AI"
-    st.write(f"**{speaker}:** {msg['content']}")
-
+    try:
+        output = hf_client.text_generation(
+            query,
+            max_new_tokens=120,
+            temperature=0.7
+        )
+        return output
+    except Exception as e:
+        return f"Error from model: {e}"
