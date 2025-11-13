@@ -278,8 +278,15 @@ with tab1:
         hist_df = st.session_state["history"].tail(30)
         fig = go.Figure()
         fig.add_trace(go.Scatter(x=hist_df["date"], y=hist_df["predicted_rainfall"], mode="lines+markers", name="Predicted Rainfall"))
-        fig.update_layout(title="Predicted Rainfall Over Time", xaxis_title="Timestamp", yaxis_title="Rainfall (mm)", template="plotly_white", width='stretch')
-        st.plotly_chart(fig, use_container_width=True)
+        fig.update_layout(
+    title="Predicted Rainfall Over Time",
+    xaxis_title="Timestamp",
+    yaxis_title="Rainfall (mm)",
+    template="plotly_white"
+)
+
+st.plotly_chart(fig, use_container_width=True)
+
 
         st.dataframe(st.session_state["history"].sort_values(by="date", ascending=False).head(10))
     else:
