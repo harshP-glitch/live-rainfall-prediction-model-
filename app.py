@@ -256,7 +256,7 @@ weather_text, farmer_advice = interpret_rainfall(rainfall_pred)
 st.markdown(f"### {weather_text}")
 st.info(f"**Farmer Guidance:** {farmer_advice}")
 
-        new_entry = {
+new_entry = {
             "date": live_data["date"],
             "predicted_rainfall": rainfall_pred,
             "humidity": live_data["humidity"],
