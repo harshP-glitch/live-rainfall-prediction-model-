@@ -272,42 +272,42 @@ ignore_index=True
         )
 
         # --- METRICS ---
-        col1, col2, col3 = st.columns(3)
-        col1.metric("🌧️ Predicted Rainfall (mm)", f"{rainfall_pred:.2f}")
-        col2.metric("💧 Humidity (%)", f"{live_data['humidity']}")
-        col3.metric("🌡️ Temperature (°C)", f"{live_data['temparature']:.1f}")
+col1, col2, col3 = st.columns(3)
+col1.metric("🌧️ Predicted Rainfall (mm)", f"{rainfall_pred:.2f}")
+col2.metric("💧 Humidity (%)", f"{live_data['humidity']}")
+col3.metric("🌡️ Temperature (°C)", f"{live_data['temparature']:.1f}")
 
-        # --- Chart: Last N Predictions ---
-        hist_df = st.session_state["history"].tail(30)
+# --- Chart: Last N Predictions ---
+hist_df = st.session_state["history"].tail(30)
 
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(
-            x=hist_df["date"],
-            y=hist_df["predicted_rainfall"],
-            mode="lines+markers",
-            name="Predicted Rainfall"
-        ))
-        fig.update_layout(
-            title="Predicted Rainfall Over Time",
-            xaxis_title="Timestamp",
-            yaxis_title="Rainfall (mm)",
-            template="plotly_white"
-        )
-        st.plotly_chart(fig, use_container_width=True)
+fig = go.Figure()
+fig.add_trace(go.Scatter(
+    x=hist_df["date"],
+    y=hist_df["predicted_rainfall"],
+    mode="lines+markers",
+    name="Predicted Rainfall"
+))
+fig.update_layout(
+    title="Predicted Rainfall Over Time",
+    xaxis_title="Timestamp",
+    yaxis_title="Rainfall (mm)",
+    template="plotly_white"
+)
+st.plotly_chart(fig, use_container_width=True)
 
-        # --- Recent Table ---
-        st.dataframe(
-            st.session_state["history"]
-            .sort_values(by="date", ascending=False)
-            .head(10)
-        )
+# --- Recent Table ---
+st.dataframe(
+    st.session_state["history"]
+    .sort_values(by="date", ascending=False)
+    .head(10)
+)
 
-    else:
-        st.warning("Could not fetch live weather at the moment. Try again later.")
+else:
+    st.warning("Could not fetch live weather at the moment. Try again later.")
 
-    # Manual refresh button
-    if st.button("🔄 Refresh Now"):
-        st.experimental_rerun()
+# Manual refresh button
+if st.button("🔄 Refresh Now"):
+    st.experimental_rerun()
 
 # ---------------- TAB 2: Model Evaluation ----------------
 with tab2:
@@ -324,13 +324,25 @@ with tab3:
     st.subheader("Historical Weather / Rainfall Trends")
     if not pdf.empty and "rainfall" in pdf.columns:
         fig = go.Figure()
-        fig.add_trace(go.Scatter(x=pdf.index, y=pdf["rainfall"], mode="lines", name="Actual Rainfall"))
-        fig.update_layout(title="Historical Rainfall Trend", xaxis_title="Date", yaxis_title="Rainfall (mm)", template="plotly_white")
-        st.plotly_chart(fig, width="stretch")
+        fig.add_trace(go.Scatter(
+            x=pdf.index,
+            y=pdf["rainfall"],
+            mode="lines",
+            name="Actual Rainfall"
+        ))
+        fig.update_layout(
+            title="Historical Rainfall Trend",
+            xaxis_title="Date",
+            yaxis_title="Rainfall (mm)",
+            template="plotly_white"
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
         st.write("### Correlation (sample)")
         st.dataframe(pdf.corr().round(2))
     else:
         st.info("Historical dataset not available in repo (Synthetic_Rainfall_Dataset_1100.csv).")
+
 
 # ---------------- TAB 4: Free HuggingFace Chatbot ----------------
 def get_hf_api_key():
