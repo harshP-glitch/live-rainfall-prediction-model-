@@ -186,17 +186,18 @@ def predict_rainfall(live_data: dict):
             else:
                 df_live[feat] = 0
 
+    # ... inside the predict_rainfall function ...
     X_live = df_live[expected_features].astype(float)
     X_scaled = feature_scaler.transform(X_live)
     
     # --- CORRECTED RESHAPE ---
-    # Reshape to (batch_size, timesteps, n_features)
-    # For a single prediction, this is (1, 1, num_features)
     X_scaled = np.array(X_scaled).reshape((1, 1, X_scaled.shape[1]))
+
+    # --- ADD THIS DEBUG LINE ---
+    st.write(f"DEBUG: Shape being passed to model: {X_scaled.shape}")
 
     y_pred = model.predict(X_scaled)
     y_inv = target_scaler.inverse_transform(y_pred.reshape(-1, 1)).flatten()
-    return float(y_inv[0])
 
 # ---------------- LOAD HISTORICAL DATA ----------------
 @st.cache_data
