@@ -55,7 +55,7 @@ import requests
 DEFAULT_CITY = "Mohali,IN"
 
 # Optional: pre-defined coordinates for Indian cities
-CITY_COORDS = {
+
     # ---------------- CITY SELECTION FOR INDIA ----------------
 
 CITY_COORDS = {
@@ -91,8 +91,6 @@ CITY_COORDS = {
     "Ghaziabad": (28.6692, 77.4538),
     "Mohali": (30.7046, 76.7179),
     "Chandigarh": (30.7333, 76.7794)
-}
-
 }
 
 def fetch_live_weather(city):
