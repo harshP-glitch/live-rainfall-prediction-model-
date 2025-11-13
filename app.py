@@ -93,6 +93,8 @@ CITY_COORDS = {
     "Chandigarh": (30.7333, 76.7794)
 }
 
+
+live_data = fetch_live_weather(city_selected)
 def fetch_live_weather(city):
     """Fetch live weather using Open-Meteo API."""
     lat, lon = CITY_COORDS[city]
@@ -365,7 +367,7 @@ user_msg = st.text_input("Ask me anything about weather:")
 if user_msg:
     full_prompt = f"User question about weather: {user_msg}. Respond simply, clearly, and as a weather expert."
 
-    bot_reply = ask_chatbot(full_prompt)
+    bot_reply = ask_chatbot(f"In {city_selected}, {user_msg}")
 
     st.session_state.chat_history.append(("You", user_msg))
     st.session_state.chat_history.append(("Bot", bot_reply))
