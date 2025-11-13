@@ -1,4 +1,3 @@
-# app.py
 # Rainfall Prediction Dashboard + Free Weather Chatbot (HuggingFace Inference API)
 # Developed for Streamlit Cloud Deployment
 # Author: Harshit Pant (adjust as needed)
@@ -189,7 +188,11 @@ def predict_rainfall(live_data: dict):
 
     X_live = df_live[expected_features].astype(float)
     X_scaled = feature_scaler.transform(X_live)
-    X_scaled = np.array(X_scaled).reshape((1, X_scaled.shape[1], 1))
+    
+    # --- CORRECTED RESHAPE ---
+    # Reshape to (batch_size, timesteps, n_features)
+    # For a single prediction, this is (1, 1, num_features)
+    X_scaled = np.array(X_scaled).reshape((1, 1, X_scaled.shape[1]))
 
     y_pred = model.predict(X_scaled)
     y_inv = target_scaler.inverse_transform(y_pred.reshape(-1, 1)).flatten()
@@ -242,21 +245,24 @@ with tab1:
 
     # --- Auto-refresh handling ---
     if auto_refresh:
-        st.experimental_rerun()
+        # Use st.rerun() instead of st.experimental_rerun()
+        st.rerun()
 
     # --- Fetch Live Weather ---
     live_data = fetch_live_weather(city_selected)
 
+    # --- ENTIRE BLOCK MOVED INSIDE 'if live_data:' ---
     if live_data:
         rainfall_pred = predict_rainfall(live_data)
-      # Interpret predicted rainfall
-weather_text, farmer_advice = interpret_rainfall(rainfall_pred)
+        
+        # Interpret predicted rainfall
+        weather_text, farmer_advice = interpret_rainfall(rainfall_pred)
 
-# Display interpretation
-st.markdown(f"### {weather_text}")
-st.info(f"**Farmer Guidance:** {farmer_advice}")
+        # Display interpretation
+        st.markdown(f"### {weather_text}")
+        st.info(f"**Farmer Guidance:** {farmer_advice}")
 
-new_entry = {
+        new_entry = {
             "date": live_data["date"],
             "predicted_rainfall": rainfall_pred,
             "humidity": live_data["humidity"],
@@ -266,47 +272,47 @@ new_entry = {
         }
 
         # Update session history
-st.session_state["history"] = pd.concat(
-[st.session_state["history"], pd.DataFrame([new_entry])],
-ignore_index=True
+        st.session_state["history"] = pd.concat(
+            [st.session_state["history"], pd.DataFrame([new_entry])],
+            ignore_index=True
         )
 
         # --- METRICS ---
-col1, col2, col3 = st.columns(3)
-col1.metric("🌧️ Predicted Rainfall (mm)", f"{rainfall_pred:.2f}")
-col2.metric("💧 Humidity (%)", f"{live_data['humidity']}")
-col3.metric("🌡️ Temperature (°C)", f"{live_data['temparature']:.1f}")
+        col1, col2, col3 = st.columns(3)
+        col1.metric("🌧️ Predicted Rainfall (mm)", f"{rainfall_pred:.2f}")
+        col2.metric("💧 Humidity (%)", f"{live_data['humidity']}")
+        col3.metric("🌡️ Temperature (°C)", f"{live_data['temparature']:.1f}")
 
-# --- Chart: Last N Predictions ---
-hist_df = st.session_state["history"].tail(30)
+        # --- Chart: Last N Predictions ---
+        hist_df = st.session_state["history"].tail(30)
 
-fig = go.Figure()
-fig.add_trace(go.Scatter(
-    x=hist_df["date"],
-    y=hist_df["predicted_rainfall"],
-    mode="lines+markers",
-    name="Predicted Rainfall"
-))
-fig.update_layout(
-    title="Predicted Rainfall Over Time",
-    xaxis_title="Timestamp",
-    yaxis_title="Rainfall (mm)",
-    template="plotly_white"
-)
-st.plotly_chart(fig, use_container_width=True)
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(
+            x=hist_df["date"],
+            y=hist_df["predicted_rainfall"],
+            mode="lines+markers",
+            name="Predicted Rainfall"
+        ))
+        fig.update_layout(
+            title="Predicted Rainfall Over Time",
+            xaxis_title="Timestamp",
+            yaxis_title="Rainfall (mm)",
+            template="plotly_white"
+        )
+        st.plotly_chart(fig, use_container_width=True)
 
-# --- Recent Table ---
-st.dataframe(
-        st.session_state["history"]
-        .sort_values(by="date", ascending=False)
-        .head(10)
-    )
-else:
-    st.warning("Could not fetch live weather at the moment. Try again later.")
+        # --- Recent Table ---
+        st.dataframe(
+            st.session_state["history"]
+            .sort_values(by="date", ascending=False)
+            .head(10)
+        )
+    else:
+        st.warning("Could not fetch live weather at the moment. Try again later.")
 
-# Manual refresh button
-if st.button("🔄 Refresh Now"):
-    st.experimental_rerun()
+    # Manual refresh button
+    if st.button("🔄 Refresh Now"):
+        st.rerun()
 
 # ---------------- TAB 2: Model Evaluation ----------------
 with tab2:
@@ -409,4 +415,3 @@ with tab4:
 # ---------------- FOOTER ----------------
 st.markdown("---")
 st.caption("Developed by Harshit Pant • Live weather: Open-Meteo • Model: LSTM")
-
