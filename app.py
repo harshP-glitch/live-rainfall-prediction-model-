@@ -1,8 +1,3 @@
-# 🌧️ Rainfall Prediction Dashboard using LSTM (Final Version)
-# ------------------------------------------------------------
-# Free API: Open-Meteo (no signup required)
-# ------------------------------------------------------------
-
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -17,256 +12,322 @@ from tensorflow.keras.models import load_model
 # 🧱 PAGE CONFIGURATION
 # ------------------------------------------------------
 st.set_page_config(
-    page_title="Rainfall Prediction Dashboard",
-    page_icon="🌧️",
+    page_title="Kisan Rainfall Assistant",
+    page_icon="🌾",
     layout="wide",
 )
+
+# ------------------------------------------------------
+# 🗣️ LOCALIZATION (Language Dictionary)
+# ------------------------------------------------------
+TRANSLATIONS = {
+    "English": {
+        "title": "🌾 Smart Rainfall & Farming Dashboard",
+        "live_tab": "🔴 Live Forecast",
+        "crop_tab": "🚜 Crop Monitor",
+        "chat_tab": "💬 Kisan Assistant",
+        "hist_tab": "📉 History",
+        "rain_label": "Predicted Rainfall",
+        "humidity": "Humidity",
+        "temp": "Temperature",
+        "wind": "Wind Speed",
+        "advice_safe": "SAFE: Good conditions for field work.",
+        "advice_caution": "CAUTION: Light rain expected. Delay spraying.",
+        "advice_danger": "ALERT: Heavy rain! Do not irrigate.",
+    },
+    "Hindi": {
+        "title": "🌾 स्मार्ट वर्षा और कृषि डैशबोर्ड",
+        "live_tab": "🔴 मौसम पूर्वानुमान",
+        "crop_tab": "🚜 फसल निगरानी",
+        "chat_tab": "💬 किसान सहायक",
+        "hist_tab": "📉 पुराना डेटा",
+        "rain_label": "अनुमानित वर्षा",
+        "humidity": "नमी",
+        "temp": "तापमान",
+        "wind": "हवा की गति",
+        "advice_safe": "सुरक्षित: खेत में काम करने के लिए अच्छा समय।",
+        "advice_caution": "सावधान: हल्की बारिश की संभावना। छिड़काव रोकें।",
+        "advice_danger": "चेतावनी: भारी बारिश! सिंचाई न करें।",
+    },
+    "Punjabi": {
+        "title": "🌾 ਸਮਾਰਟ ਮੀਂਹ ਅਤੇ ਖੇਤੀਬਾੜੀ ਡੈਸ਼ਬੋਰਡ",
+        "live_tab": "🔴 ਮੌਸਮ ਦੀ ਭਵਿੱਖਬਾਣੀ",
+        "crop_tab": "🚜 ਫਸਲ ਦੀ ਨਿਗਰਾਨੀ",
+        "chat_tab": "💬 ਕਿਸਾਨ ਸਹਾਇਕ",
+        "hist_tab": "📉 ਪਿਛਲਾ ਡੇਟਾ",
+        "rain_label": "ਅਨੁਮਾਨਤ ਮੀਂਹ",
+        "humidity": "ਨਮੀ",
+        "temp": "ਤਾਪਮਾਨ",
+        "wind": "ਹਵਾ ਦੀ ਗਤੀ",
+        "advice_safe": "ਸੁਰੱਖਿਅਤ: ਖੇਤ ਦੇ ਕੰਮ ਲਈ ਵਧੀਆ ਸਮਾਂ।",
+        "advice_caution": "ਸਾਵਧਾਨ: ਹਲਕੀ ਬਾਰਿਸ਼ ਦੀ ਉਮੀਦ। ਸਪਰੇਅ ਰੋਕੋ।",
+        "advice_danger": "ਚੇਤਾਵਨੀ: ਭਾਰੀ ਮੀਂਹ! ਸਿੰਚਾਈ ਨਾ ਕਰੋ।",
+    }
+}
+
+# ------------------------------------------------------
+# 🌾 CROP KNOWLEDGE BASE
+# ------------------------------------------------------
+CROP_INFO = {
+    "Wheat (Rabi)": {
+        "duration_days": 140,
+        "stages": [
+            (0, 20, "🌱 Germination"), (21, 60, "🌿 Tillering"),
+            (61, 90, "🌸 Flowering"), (91, 120, "🌾 Grain Filling"),
+            (121, 140, "🚜 Harvesting")
+        ],
+        "critical_rain_stage": "Flowering", 
+        "water_needs": "Moderate"
+    },
+    "Rice (Kharif)": {
+        "duration_days": 120,
+        "stages": [
+            (0, 15, "🌱 Seedling"), (16, 45, "🌿 Tillering"),
+            (46, 75, "🌸 Panicle Initiation"), (76, 105, "🌾 Grain Filling"),
+            (106, 120, "🚜 Harvesting")
+        ],
+        "critical_rain_stage": "Harvesting",
+        "water_needs": "High"
+    },
+    "Cotton": {
+        "duration_days": 160,
+        "stages": [
+            (0, 20, "🌱 Germination"), (21, 60, "🌿 Vegetative"),
+            (61, 100, "🌸 Flowering"), (101, 140, "☁️ Boll Bursting"),
+            (141, 160, "🚜 Picking")
+        ],
+        "critical_rain_stage": "Boll Bursting",
+        "water_needs": "Low"
+    }
+}
 
 # ------------------------------------------------------
 # ⚙️ LOAD MODEL AND SCALERS
 # ------------------------------------------------------
 @st.cache_resource
-def load_model_and_scalers():
-    model = load_model("rainfall.h5")
-    feature_scaler = joblib.load("feature_scaler.pkl")
-    target_scaler = joblib.load("target_scaler.pkl")
-    return model, feature_scaler, target_scaler
+def load_resources():
+    try:
+        model = load_model("rainfall.h5")
+        f_scaler = joblib.load("feature_scaler.pkl")
+        t_scaler = joblib.load("target_scaler.pkl")
+        return model, f_scaler, t_scaler
+    except Exception as e:
+        return None, None, None
 
-model, feature_scaler, target_scaler = load_model_and_scalers()
+model, feature_scaler, target_scaler = load_resources()
 
 # ------------------------------------------------------
-# 🌍 WEATHER API CONFIGURATION (Open-Meteo)
+# 🌍 API & PREDICTION FUNCTIONS
 # ------------------------------------------------------
-DEFAULT_CITY = "Mohali,IN"
-
 CITY_COORDS = {
-    "Delhi,IN": (28.6139, 77.2090),
-    "Mohali,IN": (30.7046, 76.7179),
-    "Mumbai,IN": (19.0760, 72.8777),
-    "Bengaluru,IN": (12.9716, 77.5946),
-    "Chennai,IN": (13.0827, 80.2707),
-    "Kolkata,IN": (22.5726, 88.3639)
+    "Mohali, PB": (30.7046, 76.7179),
+    "Ludhiana, PB": (30.9010, 75.8573),
+    "Delhi, NCR": (28.6139, 77.2090),
+    "Bathinda, PB": (30.2109, 74.9455)
 }
 
-def fetch_live_weather(city: str):
-    """Fetch live weather data using Open-Meteo API (no key required)."""
-    lat, lon = CITY_COORDS.get(city, (30.7046, 76.7179))  # default Mohali
-
-    url = (
-        f"https://api.open-meteo.com/v1/forecast?"
-        f"latitude={lat}&longitude={lon}"
-        f"&current_weather=true"
-        f"&hourly=rain,relative_humidity_2m,cloudcover,wind_speed_10m"
-    )
-
+def fetch_weather_with_history(city):
+    lat, lon = CITY_COORDS.get(city, (30.7046, 76.7179))
+    url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true&hourly=rain,relative_humidity_2m,cloudcover,wind_speed_10m,temperature_2m&past_days=1&forecast_days=1"
+    
     try:
-        response = requests.get(url)
-        data = response.json()
+        response = requests.get(url).json()
+        hourly = response.get("hourly", {})
+        
+        # Create Dataframe for context
+        df = pd.DataFrame({
+            "time": pd.to_datetime(hourly["time"]),
+            "rain": hourly["rain"],
+            "humidity": hourly["relative_humidity_2m"],
+            "cloud": hourly["cloudcover"],
+            "wind": hourly["wind_speed_10m"],
+            "temp": hourly["temperature_2m"]
+        })
+        
+        # Find current index
+        now = pd.Timestamp.now().floor('h')
+        df['diff'] = abs(df['time'] - now)
+        idx = df['diff'].idxmin()
 
-        if "current_weather" not in data:
-            st.error(f"API response missing expected keys: {data}")
-            return None
-
-        current = data["current_weather"]
-        humidity = data["hourly"]["relative_humidity_2m"][0] if "hourly" in data else 60
-        cloud = data["hourly"]["cloudcover"][0] if "hourly" in data else 40
+        # Helper for Lags
+        def get_val(i, col): return df.loc[i, col] if i >= 0 else 0.0
 
         return {
             "date": dt.datetime.now(),
-            "temparature": current["temperature"],
-            "humidity": humidity,
-            "windspeed": current["windspeed"],
-            "winddirection": current["winddirection"],
-            "cloud": cloud,
+            "humidity": df.loc[idx, "humidity"],
+            "temparature": df.loc[idx, "temp"],
+            "windspeed": df.loc[idx, "wind"],
+            "cloud": df.loc[idx, "cloud"],
+            # Lags calculated from real history
+            "rain_l1": get_val(idx-1, "rain"),
+            "rain_l3": get_val(idx-3, "rain"),
+            "rain_l7": get_val(idx-7, "rain"),
+            "hum_l1": get_val(idx-1, "humidity"),
+            "wind_l1": get_val(idx-1, "wind"),
+            "temp_l1": get_val(idx-1, "temp"),
+            "rain_r3": df.loc[max(0, idx-2):idx, "rain"].mean(),
+            "hum_r3": df.loc[max(0, idx-2):idx, "humidity"].mean(),
+            "cloud_r3": df.loc[max(0, idx-2):idx, "cloud"].mean(),
         }
-
-    except Exception as e:
-        st.error(f"Error fetching from Open-Meteo API: {e}")
+    except Exception:
         return None
 
-# ------------------------------------------------------
-# 🤖 PREDICTION FUNCTION (FIXED)
-# ------------------------------------------------------
-def predict_rainfall(live_data: dict):
-    """Make rainfall prediction using trained LSTM model with feature alignment."""
-    df_live = pd.DataFrame([live_data])
-
-    # 1. Engineered features (Must match training logic)
-    df_live["humidity_lag_1"] = df_live["humidity"]
-    df_live["humidity_rolling_3"] = df_live["humidity"]
-    df_live["cloud_rolling_3"] = df_live["cloud"]
-    df_live["dayofweek"] = dt.datetime.now().weekday()
-    df_live["month"] = dt.datetime.now().month
-
-    # 2. Define the EXACT feature order used in training
-    # IMPORTANT: 'winddirection' is excluded here because it wasn't in your training list
-    train_features = [
-        "humidity_lag_1", 
-        "humidity_rolling_3", 
-        "cloud_rolling_3",
-        "dayofweek", 
-        "month", 
-        "temparature", 
-        "windspeed", 
-        "cloud", 
-        "humidity"
+def predict_rain(data):
+    if not model: return 0.0
+    
+    # 1. Prepare Dataframe
+    df = pd.DataFrame([data])
+    df["dayofweek"] = dt.datetime.now().weekday()
+    df["month"] = dt.datetime.now().month
+    
+    # 2. Map to Scaler Feature Names (Strict Order)
+    # Check feature_scaler.feature_names_in_ if you get an error
+    features = [
+        'rain_l1', 'rain_l3', 'rain_l7', 'hum_l1', 'wind_l1', 'temp_l1',
+        'rain_r3', 'hum_r3', 'cloud_r3', 'month', 'dayofweek'
     ]
-
-    # 3. Attempt to auto-detect features from the scaler if possible
+    
+    # Renaming dictionary to match typical scaler names if needed
+    # (Adjust keys based on your training data names)
+    input_data = df.rename(columns={
+        "rain_l1": "rainfall_lag_1", "rain_l3": "rainfall_lag_3", "rain_l7": "rainfall_lag_7",
+        "hum_l1": "humidity_lag_1", "wind_l1": "windspeed_lag_1", "temp_l1": "temparature_lag_1",
+        "rain_r3": "rainfall_rolling_3", "hum_r3": "humidity_rolling_3", "cloud_r3": "cloud_rolling_3"
+    })
+    
+    # Hardcoded list matching the likely training order
+    final_cols = [
+        "rainfall_lag_1", "rainfall_lag_3", "rainfall_lag_7",
+        "humidity_lag_1", "windspeed_lag_1", "temparature_lag_1",
+        "rainfall_rolling_3", "humidity_rolling_3", "cloud_rolling_3",
+        "month", "dayofweek"
+    ]
+    
     try:
-        if hasattr(feature_scaler, "n_features_in_"):
-             # DEBUG: Show what the scaler wants on the screen
-            expected_count = feature_scaler.n_features_in_
-            st.write(f"🔍 **Debug:** Scaler expects {expected_count} features.")
-            
-            # If the scaler saved feature names, use them
-            if hasattr(feature_scaler, "feature_names_in_"):
-                train_features = list(feature_scaler.feature_names_in_)
-                st.write(f"📋 **Debug:** Using feature names from scaler: {train_features}")
+        X = input_data[final_cols].to_numpy().reshape(1, -1)
+        X_scaled = feature_scaler.transform(X).reshape(1, 1, 11)
+        y = model.predict(X_scaled)
+        return max(0.0, float(target_scaler.inverse_transform(y)[0][0]))
     except Exception as e:
-        st.warning(f"Could not detect scaler features: {e}")
-
-    # 4. Select only the required columns
-    try:
-        X_live = df_live[train_features]
-        
-        # DEBUG: Check shape before scaling
-        st.write(f"🔢 **Debug:** Input shape being sent to scaler: {X_live.shape}")
-        
-        if X_live.shape[1] != feature_scaler.n_features_in_:
-             st.error(f"🚨 **Mismatch:** You provided {X_live.shape[1]} features, but scaler wants {feature_scaler.n_features_in_}.")
-
-    except KeyError as e:
-        st.error(f"Missing column in live data: {e}")
+        st.error(f"Prediction logic mismatch: {e}")
         return 0.0
 
-    # 5. Transform
-    X_scaled = feature_scaler.transform(X_live.to_numpy().reshape(1, -1))
-    X_scaled = X_scaled.reshape((1, X_scaled.shape[1], 1))
-    
-    y_pred = model.predict(X_scaled)
-    return float(target_scaler.inverse_transform(y_pred)[0][0])
-# ------------------------------------------------------
-# 📊 LOAD HISTORICAL DATA
-# ------------------------------------------------------
-@st.cache_data
-def load_historical_data():
-    try:
-        df = pd.read_csv("Synthetic_Rainfall_Dataset_1100.csv")
-        if "date" in df.columns:
-            df["date"] = pd.to_datetime(df["date"], errors="coerce")
-            df.dropna(subset=["date"], inplace=True)
-            df.set_index("date", inplace=True)
-        return df
-    except FileNotFoundError:
-        st.error("❌ Historical dataset file not found. Upload `Synthetic_Rainfall_Dataset_1100.csv` to your repo.")
-        return pd.DataFrame()
-
-pdf = load_historical_data()
+def get_chatbot_response(msg):
+    msg = msg.lower()
+    if "hello" in msg: return "Namaste! I am your Kisan Assistant. Ask about rain, crops, or fertilizers."
+    if "rice" in msg or "paddy" in msg: return "Rice needs standing water. If rain is predicted > 10mm, stop tube well irrigation."
+    if "wheat" in msg: return "Wheat is sensitive to waterlogging at the grain-filling stage. Ensure drainage."
+    if "rain" in msg: return "I use an LSTM AI model to analyze past weather and predict rain intensity."
+    return "I am learning. Please ask about 'Rice', 'Wheat', or 'Weather'."
 
 # ------------------------------------------------------
-# 🧭 SIDEBAR CONTROLS
+# 🖥️ MAIN UI
 # ------------------------------------------------------
-st.sidebar.header("⚙️ Dashboard Controls")
-city = st.sidebar.selectbox("Select City", list(CITY_COORDS.keys()), index=1)
-auto_refresh = st.sidebar.checkbox("Auto-refresh Predictions", value=False)
-refresh_rate = st.sidebar.slider("Refresh Interval (seconds)", 30, 300, 60)
-st.sidebar.markdown("---")
-st.sidebar.info("Using Open-Meteo (free, no key needed)")
 
-# ------------------------------------------------------
-# 🌧️ MAIN DASHBOARD UI
-# ------------------------------------------------------
-st.title("🌧️ Rainfall Prediction Dashboard using LSTM")
-st.markdown(
-    """
-    This dashboard predicts **rainfall intensity** using a Long Short-Term Memory (**LSTM**) deep learning model.
-    Real-time weather data is fetched via the **Open-Meteo API** (no key required).
-    """
-)
+# Sidebar
+st.sidebar.image("https://cdn-icons-png.flaticon.com/512/3025/3025528.png", width=100)
+st.sidebar.header("⚙️ Settings / सेटिंग्स")
+lang = st.sidebar.selectbox("Language / भाषा", ["English", "Hindi", "Punjabi"])
+city = st.sidebar.selectbox("Select Location", list(CITY_COORDS.keys()))
+t = TRANSLATIONS[lang]
 
-tab1, tab2, tab3 = st.tabs(["📈 Live Predictions", "📊 Model Evaluation", "📉 Historical Trends"])
+st.title(t["title"])
 
-# -------------------- TAB 1: LIVE PREDICTIONS --------------------
+# Navigation
+tab1, tab2, tab3, tab4 = st.tabs([t["live_tab"], t["crop_tab"], t["chat_tab"], t["hist_tab"]])
+
+# --- TAB 1: LIVE DASHBOARD ---
 with tab1:
-    st.subheader("Live Weather & Predicted Rainfall")
-
-    if "history" not in st.session_state:
-        st.session_state["history"] = pd.DataFrame(columns=["date", "predicted_rainfall", "humidity", "temparature", "windspeed"])
-
-    placeholder = st.empty()
-
-    live_data = fetch_live_weather(city)
-    if live_data:
-        rainfall_pred = predict_rainfall(live_data)
-
-        new_entry = {
-            "date": live_data["date"],
-            "predicted_rainfall": rainfall_pred,
-            "humidity": live_data["humidity"],
-            "temparature": live_data["temparature"],
-            "windspeed": live_data["windspeed"],
-        }
-        st.session_state["history"] = pd.concat(
-            [st.session_state["history"], pd.DataFrame([new_entry])], ignore_index=True
-        )
-
-        with placeholder.container():
-            col1, col2, col3 = st.columns(3)
-            col1.metric("🌧️ Predicted Rainfall (mm)", f"{rainfall_pred:.2f}")
-            col2.metric("💧 Humidity (%)", f"{live_data['humidity']}")
-            col3.metric("🌡️ Temperature (°C)", f"{live_data['temparature']:.1f}")
-
-            # Time Series Chart
-            hist_df = st.session_state["history"].tail(30)
-            fig = go.Figure()
-            fig.add_trace(go.Scatter(
-                x=hist_df["date"], y=hist_df["predicted_rainfall"],
-                mode="lines+markers", name="Predicted Rainfall"
-            ))
-            fig.update_layout(
-                title="Predicted Rainfall Over Time",
-                xaxis_title="Timestamp",
-                yaxis_title="Rainfall (mm)",
-                template="plotly_white"
-            )
-            st.plotly_chart(fig, use_container_width=True)
-            st.dataframe(hist_df.tail(10))
-
-        if auto_refresh:
-            time.sleep(refresh_rate)
-            st.rerun()
-
-# -------------------- TAB 2: MODEL EVALUATION --------------------
-with tab2:
-    st.subheader("Model Evaluation Metrics (from Training Phase)")
-    mae, mse, r2 = 0.312, 0.248, 0.917
-
-    col1, col2, col3 = st.columns(3)
-    col1.metric("📉 MAE", f"{mae:.3f}")
-    col2.metric("📈 MSE", f"{mse:.3f}")
-    col3.metric("🔢 R² Score", f"{r2:.3f}")
-
-    st.info("These metrics represent the model's performance on the test dataset during training.")
-
-# -------------------- TAB 3: HISTORICAL DATA --------------------
-with tab3:
-    st.subheader("Historical Weather Trends")
-    if not pdf.empty:
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(x=pdf.index, y=pdf["rainfall"], mode="lines", name="Actual Rainfall"))
-        fig.update_layout(
-            title="Historical Rainfall Trend",
-            xaxis_title="Date",
-            yaxis_title="Rainfall (mm)",
-            template="plotly_white"
-        )
-        st.plotly_chart(fig, use_container_width=True)
-        st.write("### Correlation Heatmap (sample)")
-        st.dataframe(pdf.corr().round(2))
+    if model is None:
+        st.error("🚨 Model files not found! Please upload .h5 and .pkl files.")
     else:
-        st.warning("No historical dataset loaded.")
+        weather = fetch_weather_with_history(city)
+        if weather:
+            pred_rain = predict_rain(weather)
+            
+            # TRAFFIC LIGHT ADVISORY
+            st.write("---")
+            if pred_rain > 5.0:
+                st.error(f"🔴 **{t['advice_danger']}**")
+            elif pred_rain > 0.5:
+                st.warning(f"🟡 **{t['advice_caution']}**")
+            else:
+                st.success(f"🟢 **{t['advice_safe']}**")
+            st.write("---")
 
-# -------------------- FOOTER --------------------
-st.markdown("---")
-st.caption("Developed by Harsh Pant • Powered by Open-Meteo API • Model: LSTM Neural Network")
+            # Metrics
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric(t["rain_label"], f"{pred_rain:.2f} mm")
+            c2.metric(t["humidity"], f"{weather['humidity']}%")
+            c3.metric(t["temp"], f"{weather['temparature']} °C")
+            c4.metric(t["wind"], f"{weather['windspeed']} km/h")
+            
+            # Store for other tabs
+            st.session_state['last_rain'] = pred_rain
+        else:
+            st.warning("Could not fetch weather data. Check internet.")
+
+# --- TAB 2: CROP MONITOR ---
+with tab2:
+    st.subheader(f"{t['crop_tab']}")
+    c1, c2 = st.columns([1, 2])
+    
+    with c1:
+        s_crop = st.selectbox("Select Crop", list(CROP_INFO.keys()))
+        s_date = st.date_input("Sowing Date", dt.date.today() - dt.timedelta(days=30))
+        
+        days_age = (dt.date.today() - s_date).days
+        st.info(f"📅 Crop Age: **{days_age} Days**")
+        
+    with c2:
+        if days_age >= 0:
+            c_data = CROP_INFO[s_crop]
+            stage = "Unknown"
+            prog = 0.0
+            for start, end, name in c_data["stages"]:
+                if start <= days_age <= end:
+                    stage = name
+                    prog = min(1.0, (days_age - start) / (end - start + 1))
+            
+            if days_age > c_data["duration_days"]: stage = "Harvested/Finished"
+            
+            st.markdown(f"### 🌾 Stage: {stage}")
+            # Visual progress bar logic
+            st.progress(min(1.0, days_age / c_data["duration_days"]), text="Lifecycle Progress")
+
+            # SMART ADVICE
+            rain_val = st.session_state.get('last_rain', 0.0)
+            
+            st.markdown("#### 🧠 AI Farmer Advice")
+            if c_data["critical_rain_stage"] in stage and rain_val > 2.0:
+                 st.error(f"⚠️ **DANGER:** Rain predicted during {stage}! Check drainage immediately.")
+            elif rain_val < 1.0 and c_data["water_needs"] == "High":
+                 st.info("💧 **Irrigation:** Soil moisture low. You can irrigate today.")
+            else:
+                 st.success("✅ **Status:** Crop conditions are stable.")
+
+# --- TAB 3: CHATBOT ---
+with tab3:
+    st.subheader(t["chat_tab"])
+    if "messages" not in st.session_state:
+        st.session_state.messages = [{"role": "assistant", "content": "Sat Sri Akal! How can I help your farm today?"}]
+
+    for msg in st.session_state.messages:
+        st.chat_message(msg["role"]).write(msg["content"])
+
+    if prompt := st.chat_input("Ask about weather, crops..."):
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        st.chat_message("user").write(prompt)
+        
+        resp = get_chatbot_response(prompt)
+        st.session_state.messages.append({"role": "assistant", "content": resp})
+        st.chat_message("assistant").write(resp)
+
+# --- TAB 4: HISTORY ---
+with tab4:
+    st.subheader(t["hist_tab"])
+    try:
+        df_hist = pd.read_csv("Synthetic_Rainfall_Dataset_1100.csv")
+        st.line_chart(df_hist["rainfall"]) # Simple chart for speed
+    except:
+        st.warning("Historical CSV file not found.")
