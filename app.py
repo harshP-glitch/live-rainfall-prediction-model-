@@ -18,15 +18,23 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for "Card" look and Traffic Lights
+# 🛑 CSS FIX: FORCE BLACK TEXT ON CARDS & TRAFFIC LIGHTS
 st.markdown("""
     <style>
+    /* Metric Card Styling */
     div[data-testid="stMetric"] {
-        background-color: #f8f9fa;
-        border: 1px solid #dee2e6;
+        background-color: #f0f2f6 !important; /* Light Gray Background */
+        border: 1px solid #d1d5db;
         padding: 15px;
         border-radius: 10px;
     }
+    
+    /* FORCE TEXT BLACK in Dark Mode */
+    div[data-testid="stMetricLabel"] p { color: #31333F !important; font-weight: bold; }
+    div[data-testid="stMetricValue"] div { color: #000000 !important; }
+    div[data-testid="stMetricDelta"] div { color: #000000 !important; }
+
+    /* Traffic Light Box Styles */
     .traffic-red {
         background-color: #ffe6e6; border: 2px solid #ff4d4d; 
         padding: 20px; border-radius: 10px; text-align: center; color: #cc0000;
@@ -39,6 +47,9 @@ st.markdown("""
         background-color: #d4edda; border: 2px solid #28a745; 
         padding: 20px; border-radius: 10px; text-align: center; color: #155724;
     }
+    
+    /* Header Black Text Fix */
+    h1, h2, h3 { color: inherit; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -161,10 +172,9 @@ def fetch_weather_and_predict(city):
         }
         
         # --- PREPARE FEATURES FOR LSTM ---
-        # 1. Helper to get lags safely
         def val(i, c): return df.loc[i, c] if i >= 0 else 0.0
         
-        # 2. Build feature list exactly as Scaler expects (11 features)
+        # STRICT ORDER for Scaler (11 Features)
         features = [
             val(idx-1, "rain"), val(idx-3, "rain"), val(idx-7, "rain"), # Lags
             val(idx-1, "hum"), val(idx-1, "wind"), val(idx-1, "temp"),
@@ -174,15 +184,13 @@ def fetch_weather_and_predict(city):
             dt.datetime.now().month, dt.datetime.now().weekday()
         ]
         
-        # 3. Scale
         X_raw = np.array(features).reshape(1, -1)
         X_scaled = feature_scaler.transform(X_raw).reshape(1, 1, 11)
         
-        # 4. Handle Dimension Mismatch (11 vs 1)
+        # FIX FOR 1 vs 11 FEATURE ERROR
         if model.input_shape[-1] == 1:
             X_scaled = X_scaled[:, :, 0:1]
             
-        # 5. Predict
         y = model.predict(X_scaled)
         pred_val = max(0.0, float(target_scaler.inverse_transform(y)[0][0]))
         
@@ -217,7 +225,6 @@ def get_bot_response(msg, weather, crop_data):
 # 🖥️ UI LAYOUTS
 # ------------------------------------------------------
 
-# --- SESSION STATE SETUP ---
 if "page" not in st.session_state: st.session_state.page = "landing"
 if "crop_data" not in st.session_state: st.session_state.crop_data = {}
 if "last_weather" not in st.session_state: st.session_state.last_weather = {}
@@ -249,30 +256,26 @@ def render_landing():
 def render_dashboard():
     data = st.session_state.crop_data
     
-    # Header
     c1, c2 = st.columns([3, 1])
     c1.title(f"🚜 {data['name']}'s Farm")
     if c2.button("🔄 Change Crop"):
         st.session_state.page = "landing"
         st.rerun()
 
-    # Get Data
     weather, pred_rain = fetch_weather_and_predict(data["city"])
     if weather: 
         weather['pred_rain'] = pred_rain
         st.session_state.last_weather = weather
     
-    # CROP CALCULATIONS
     crop_conf = CROP_INFO[data["crop"]]
     days_age = (dt.date.today() - data["sowing_date"]).days
     
-    # Determine Stage
     current_stage = "Unknown"
     for s, e, n in crop_conf["stages"]:
         if s <= days_age <= e: current_stage = n; break
     if days_age > crop_conf["duration_days"]: current_stage = "Harvest Ready"
 
-    # --- KPI ROW ---
+    # --- KPI ROW (Black text forced via CSS) ---
     k1, k2, k3, k4 = st.columns(4)
     k1.metric("🌱 Age", f"{days_age} Days")
     k2.metric("📍 Stage", current_stage)
@@ -282,14 +285,10 @@ def render_dashboard():
 
     st.markdown("---")
 
-    # --- TABS ---
     tab1, tab2, tab3, tab4 = st.tabs([t["tab_live"], t["tab_crop"], t["tab_chat"], t["tab_log"]])
 
-    # TAB 1: WEATHER & TRAFFIC LIGHT
     with tab1:
         st.subheader("Live Advisory")
-        
-        # Traffic Light Logic
         if pred_rain > 5.0:
             st.markdown(f"""<div class='traffic-red'><h2>🚫 STOP</h2><p>Heavy Rain ({pred_rain:.1f}mm). Do not spray or irrigate.</p></div>""", unsafe_allow_html=True)
         elif pred_rain > 0.5:
@@ -298,7 +297,6 @@ def render_dashboard():
             st.markdown(f"""<div class='traffic-green'><h2>🟢 GO</h2><p>Clear weather. Safe for farm operations.</p></div>""", unsafe_allow_html=True)
 
         st.write("")
-        # Metric Cards
         m1, m2, m3, m4 = st.columns(4)
         if weather:
             m1.metric("Rainfall", f"{pred_rain:.1f} mm")
@@ -306,18 +304,19 @@ def render_dashboard():
             m3.metric("Wind", f"{weather['wind']} km/h")
             m4.metric("Temp", f"{weather['temp']} °C")
 
-    # TAB 2: CROP VISUALS
     with tab2:
         c1, c2 = st.columns([2, 1])
         with c1:
             st.subheader("Growth Trajectory")
-            # S-Curve Visualization
+            
+
+[Image of crop growth stages timeline]
+
             x = list(range(0, crop_conf["duration_days"] + 1, 5))
             y = [100 / (1 + np.exp(-0.1 * (i - crop_conf["duration_days"]/2))) for i in x]
             
             fig = go.Figure()
             fig.add_trace(go.Scatter(x=x, y=y, name="Ideal Growth", line=dict(color='green', dash='dot')))
-            # Current Point
             curr_y = 100 / (1 + np.exp(-0.1 * (days_age - crop_conf["duration_days"]/2)))
             fig.add_trace(go.Scatter(x=[days_age], y=[curr_y], mode='markers', marker=dict(color='red', size=15), name="You are here"))
             
@@ -326,10 +325,10 @@ def render_dashboard():
 
         with c2:
             st.subheader("Visual Guide")
-            # Placeholder for visual reference st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/3/3d/Wheat_growth_stages.png/320px-Wheat_growth_stages.png", caption="Wheat Stages Reference")
+            # Image Reference for stages
+            st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/3/3d/Wheat_growth_stages.png/320px-Wheat_growth_stages.png", caption="Wheat Stages Reference")
             st.info(f"Current Phase: **{current_stage}**")
 
-    # TAB 3: CHATBOT
     with tab3:
         st.subheader("🤖 Kisan Assistant")
         if "messages" not in st.session_state: 
@@ -341,21 +340,16 @@ def render_dashboard():
         if prompt := st.chat_input("Ask a question..."):
             st.chat_message("user").write(prompt)
             st.session_state.messages.append({"role": "user", "content": prompt})
-            
-            # Smart Response
             resp = get_bot_response(prompt, st.session_state.last_weather, st.session_state.crop_data)
-            
             st.chat_message("assistant").write(resp)
             st.session_state.messages.append({"role": "assistant", "content": resp})
 
-    # TAB 4: LOGS
     with tab4:
         st.subheader("📖 Farm Journal")
         note = st.text_area("Add a note", placeholder="e.g., Applied Urea today...")
         if st.button("Save Note"):
             st.success("Note saved to local log.")
 
-# --- MAIN ROUTER ---
 if st.session_state.page == "landing":
     render_landing()
 else:
