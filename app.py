@@ -9,59 +9,69 @@ import time
 from tensorflow.keras.models import load_model
 
 # ------------------------------------------------------
-# 🧱 PAGE CONFIGURATION
+# 🧱 PAGE CONFIGURATION & STYLING
 # ------------------------------------------------------
 st.set_page_config(
-    page_title="Kisan Rainfall Assistant",
+    page_title="Kisan Smart Farm",
     page_icon="🌾",
     layout="wide",
+    initial_sidebar_state="expanded"
 )
 
+# Custom CSS for "Card" look and Traffic Lights
+st.markdown("""
+    <style>
+    div[data-testid="stMetric"] {
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        padding: 15px;
+        border-radius: 10px;
+    }
+    .traffic-red {
+        background-color: #ffe6e6; border: 2px solid #ff4d4d; 
+        padding: 20px; border-radius: 10px; text-align: center; color: #cc0000;
+    }
+    .traffic-yellow {
+        background-color: #fff3cd; border: 2px solid #ffc107; 
+        padding: 20px; border-radius: 10px; text-align: center; color: #856404;
+    }
+    .traffic-green {
+        background-color: #d4edda; border: 2px solid #28a745; 
+        padding: 20px; border-radius: 10px; text-align: center; color: #155724;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 # ------------------------------------------------------
-# 🗣️ LOCALIZATION (Language Dictionary)
+# 🗣️ LANGUAGE & TRANSLATIONS
 # ------------------------------------------------------
 TRANSLATIONS = {
     "English": {
-        "title": "🌾 Smart Rainfall & Farming Dashboard",
-        "live_tab": "🔴 Live Forecast",
-        "crop_tab": "🚜 Crop Monitor",
-        "chat_tab": "💬 Kisan Assistant",
-        "hist_tab": "📉 History",
-        "rain_label": "Predicted Rainfall",
-        "humidity": "Humidity",
-        "temp": "Temperature",
-        "wind": "Wind Speed",
-        "advice_safe": "SAFE: Good conditions for field work.",
-        "advice_caution": "CAUTION: Light rain expected. Delay spraying.",
-        "advice_danger": "ALERT: Heavy rain! Do not irrigate.",
+        "welcome": "Welcome to Kisan Smart Farm",
+        "enter_details": "Enter your farm details to get smart advisory.",
+        "generate": "🚀 Generate Dashboard",
+        "tab_live": "🌦️ Weather & Advisory",
+        "tab_crop": "🌾 Crop Health",
+        "tab_chat": "💬 Kisan Assistant",
+        "tab_log": "📝 Farm Log",
     },
     "Hindi": {
-        "title": "🌾 स्मार्ट वर्षा और कृषि डैशबोर्ड",
-        "live_tab": "🔴 मौसम पूर्वानुमान",
-        "crop_tab": "🚜 फसल निगरानी",
-        "chat_tab": "💬 किसान सहायक",
-        "hist_tab": "📉 पुराना डेटा",
-        "rain_label": "अनुमानित वर्षा",
-        "humidity": "नमी",
-        "temp": "तापमान",
-        "wind": "हवा की गति",
-        "advice_safe": "सुरक्षित: खेत में काम करने के लिए अच्छा समय।",
-        "advice_caution": "सावधान: हल्की बारिश की संभावना। छिड़काव रोकें।",
-        "advice_danger": "चेतावनी: भारी बारिश! सिंचाई न करें।",
+        "welcome": "किसान स्मार्ट फार्म में आपका स्वागत है",
+        "enter_details": "स्मार्ट सलाह प्राप्त करने के लिए अपना विवरण दर्ज करें।",
+        "generate": "🚀 डैशबोर्ड बनाएं",
+        "tab_live": "🌦️ मौसम और सलाह",
+        "tab_crop": "🌾 फसल स्वास्थ्य",
+        "tab_chat": "💬 किसान सहायक",
+        "tab_log": "📝 खेती डायरी",
     },
     "Punjabi": {
-        "title": "🌾 ਸਮਾਰਟ ਮੀਂਹ ਅਤੇ ਖੇਤੀਬਾੜੀ ਡੈਸ਼ਬੋਰਡ",
-        "live_tab": "🔴 ਮੌਸਮ ਦੀ ਭਵਿੱਖਬਾਣੀ",
-        "crop_tab": "🚜 ਫਸਲ ਦੀ ਨਿਗਰਾਨੀ",
-        "chat_tab": "💬 ਕਿਸਾਨ ਸਹਾਇਕ",
-        "hist_tab": "📉 ਪਿਛਲਾ ਡੇਟਾ",
-        "rain_label": "ਅਨੁਮਾਨਤ ਮੀਂਹ",
-        "humidity": "ਨਮੀ",
-        "temp": "ਤਾਪਮਾਨ",
-        "wind": "ਹਵਾ ਦੀ ਗਤੀ",
-        "advice_safe": "ਸੁਰੱਖਿਅਤ: ਖੇਤ ਦੇ ਕੰਮ ਲਈ ਵਧੀਆ ਸਮਾਂ।",
-        "advice_caution": "ਸਾਵਧਾਨ: ਹਲਕੀ ਬਾਰਿਸ਼ ਦੀ ਉਮੀਦ। ਸਪਰੇਅ ਰੋਕੋ।",
-        "advice_danger": "ਚੇਤਾਵਨੀ: ਭਾਰੀ ਮੀਂਹ! ਸਿੰਚਾਈ ਨਾ ਕਰੋ।",
+        "welcome": "ਕਿਸਾਨ ਸਮਾਰਟ ਫਾਰਮ ਵਿੱਚ ਜੀ ਆਇਆਂ ਨੂੰ",
+        "enter_details": "ਸਮਾਰਟ ਸਲਾਹ ਲੈਣ ਲਈ ਆਪਣੇ ਖੇਤ ਦੇ ਵੇਰਵੇ ਭਰੋ।",
+        "generate": "🚀 ਡੈਸ਼ਬੋਰਡ ਤਿਆਰ ਕਰੋ",
+        "tab_live": "🌦️ ਮੌਸਮ ਅਤੇ ਸਲਾਹ",
+        "tab_crop": "🌾 ਫਸਲ ਦੀ ਸਿਹਤ",
+        "tab_chat": "💬 ਕਿਸਾਨ ਸਹਾਇਕ",
+        "tab_log": "📝 ਖੇਤੀ ਡਾਇਰੀ",
     }
 }
 
@@ -76,8 +86,7 @@ CROP_INFO = {
             (61, 90, "🌸 Flowering"), (91, 120, "🌾 Grain Filling"),
             (121, 140, "🚜 Harvesting")
         ],
-        "critical_rain_stage": "Flowering", 
-        "water_needs": "Moderate"
+        "critical_rain_stage": "Flowering"
     },
     "Rice (Kharif)": {
         "duration_days": 120,
@@ -86,8 +95,7 @@ CROP_INFO = {
             (46, 75, "🌸 Panicle Initiation"), (76, 105, "🌾 Grain Filling"),
             (106, 120, "🚜 Harvesting")
         ],
-        "critical_rain_stage": "Harvesting",
-        "water_needs": "High"
+        "critical_rain_stage": "Harvesting"
     },
     "Cotton": {
         "duration_days": 160,
@@ -96,13 +104,19 @@ CROP_INFO = {
             (61, 100, "🌸 Flowering"), (101, 140, "☁️ Boll Bursting"),
             (141, 160, "🚜 Picking")
         ],
-        "critical_rain_stage": "Boll Bursting",
-        "water_needs": "Low"
+        "critical_rain_stage": "Boll Bursting"
     }
 }
 
+CITY_COORDS = {
+    "Mohali, PB": (30.7046, 76.7179),
+    "Ludhiana, PB": (30.9010, 75.8573),
+    "Delhi, NCR": (28.6139, 77.2090),
+    "Bathinda, PB": (30.2109, 74.9455)
+}
+
 # ------------------------------------------------------
-# ⚙️ LOAD MODEL AND SCALERS
+# ⚙️ LOAD RESOURCES
 # ------------------------------------------------------
 @st.cache_resource
 def load_resources():
@@ -117,236 +131,232 @@ def load_resources():
 model, feature_scaler, target_scaler = load_resources()
 
 # ------------------------------------------------------
-# 🌍 API & PREDICTION FUNCTIONS
+# 🌍 API & PREDICTION LOGIC
 # ------------------------------------------------------
-CITY_COORDS = {
-    "Mohali, PB": (30.7046, 76.7179),
-    "Ludhiana, PB": (30.9010, 75.8573),
-    "Delhi, NCR": (28.6139, 77.2090),
-    "Bathinda, PB": (30.2109, 74.9455)
-}
-
-def fetch_weather_with_history(city):
+def fetch_weather_and_predict(city):
+    """Fetches history + live data and runs LSTM prediction."""
+    if not model: return None, 0.0
+    
     lat, lon = CITY_COORDS.get(city, (30.7046, 76.7179))
     url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true&hourly=rain,relative_humidity_2m,cloudcover,wind_speed_10m,temperature_2m&past_days=1&forecast_days=1"
     
     try:
-        response = requests.get(url).json()
-        hourly = response.get("hourly", {})
-        
-        # Create Dataframe for context
+        resp = requests.get(url).json()
+        h = resp.get("hourly", {})
         df = pd.DataFrame({
-            "time": pd.to_datetime(hourly["time"]),
-            "rain": hourly["rain"],
-            "humidity": hourly["relative_humidity_2m"],
-            "cloud": hourly["cloudcover"],
-            "wind": hourly["wind_speed_10m"],
-            "temp": hourly["temperature_2m"]
+            "time": pd.to_datetime(h["time"]),
+            "rain": h["rain"], "hum": h["relative_humidity_2m"],
+            "cloud": h["cloudcover"], "wind": h["wind_speed_10m"], "temp": h["temperature_2m"]
         })
         
-        # Find current index
+        # Get Current Index
         now = pd.Timestamp.now().floor('h')
         df['diff'] = abs(df['time'] - now)
         idx = df['diff'].idxmin()
-
-        # Helper for Lags
-        def get_val(i, col): return df.loc[i, col] if i >= 0 else 0.0
-
-        return {
-            "date": dt.datetime.now(),
-            "humidity": df.loc[idx, "humidity"],
-            "temparature": df.loc[idx, "temp"],
-            "windspeed": df.loc[idx, "wind"],
-            "cloud": df.loc[idx, "cloud"],
-            # Lags calculated from real history
-            "rain_l1": get_val(idx-1, "rain"),
-            "rain_l3": get_val(idx-3, "rain"),
-            "rain_l7": get_val(idx-7, "rain"),
-            "hum_l1": get_val(idx-1, "humidity"),
-            "wind_l1": get_val(idx-1, "wind"),
-            "temp_l1": get_val(idx-1, "temp"),
-            "rain_r3": df.loc[max(0, idx-2):idx, "rain"].mean(),
-            "hum_r3": df.loc[max(0, idx-2):idx, "humidity"].mean(),
-            "cloud_r3": df.loc[max(0, idx-2):idx, "cloud"].mean(),
+        
+        # Current Weather Dict
+        current_weather = {
+            "temp": df.loc[idx, "temp"], "hum": df.loc[idx, "hum"],
+            "wind": df.loc[idx, "wind"], "cloud": df.loc[idx, "cloud"]
         }
-    except Exception:
-        return None
-
-def predict_rain(data):
-    if not model: return 0.0
-    
-    # 1. Prepare Dataframe
-    df = pd.DataFrame([data])
-    df["dayofweek"] = dt.datetime.now().weekday()
-    df["month"] = dt.datetime.now().month
-    
-    # 2. Rename columns to match Scaler's expected names
-    # Note: 'temparature' is kept as per your previous scaler keys
-    input_data = df.rename(columns={
-        "rain_l1": "rainfall_lag_1", "rain_l3": "rainfall_lag_3", "rain_l7": "rainfall_lag_7",
-        "hum_l1": "humidity_lag_1", "wind_l1": "windspeed_lag_1", "temp_l1": "temparature_lag_1",
-        "rain_r3": "rainfall_rolling_3", "hum_r3": "humidity_rolling_3", "cloud_r3": "cloud_rolling_3"
-    })
-    
-    # 3. Define the strict column order for the Scaler (11 features)
-    final_cols = [
-        "rainfall_lag_1", "rainfall_lag_3", "rainfall_lag_7",
-        "humidity_lag_1", "windspeed_lag_1", "temparature_lag_1",
-        "rainfall_rolling_3", "humidity_rolling_3", "cloud_rolling_3",
-        "month", "dayofweek"
-    ]
-    
-    try:
-        # A. Select columns and Shape for Scaler: (1 sample, 11 features)
-        X_raw = input_data[final_cols].to_numpy().reshape(1, -1)
         
-        # B. Scale the data (Scaler expects 11 features)
-        X_scaled = feature_scaler.transform(X_raw)
+        # --- PREPARE FEATURES FOR LSTM ---
+        # 1. Helper to get lags safely
+        def val(i, c): return df.loc[i, c] if i >= 0 else 0.0
         
-        # C. Reshape for LSTM: (1 sample, 1 timestep, 11 features)
-        X_ready = X_scaled.reshape(1, 1, 11)
+        # 2. Build feature list exactly as Scaler expects (11 features)
+        features = [
+            val(idx-1, "rain"), val(idx-3, "rain"), val(idx-7, "rain"), # Lags
+            val(idx-1, "hum"), val(idx-1, "wind"), val(idx-1, "temp"),
+            df.loc[max(0, idx-2):idx, "rain"].mean(), # Rolling 3
+            df.loc[max(0, idx-2):idx, "hum"].mean(),
+            df.loc[max(0, idx-2):idx, "cloud"].mean(),
+            dt.datetime.now().month, dt.datetime.now().weekday()
+        ]
         
-        # 🛑 D. CRITICAL FIX: Handle Feature Mismatch 🛑
-        # The error said model expects 1 feature, but we have 11.
-        # We check the model's input shape dynamically.
+        # 3. Scale
+        X_raw = np.array(features).reshape(1, -1)
+        X_scaled = feature_scaler.transform(X_raw).reshape(1, 1, 11)
         
-        # Get expected features (last dimension of input shape)
-        # model.input_shape is usually (None, Timesteps, Features)
-        expected_features = model.input_shape[-1]
+        # 4. Handle Dimension Mismatch (11 vs 1)
+        if model.input_shape[-1] == 1:
+            X_scaled = X_scaled[:, :, 0:1]
+            
+        # 5. Predict
+        y = model.predict(X_scaled)
+        pred_val = max(0.0, float(target_scaler.inverse_transform(y)[0][0]))
         
-        if expected_features == 1 and X_ready.shape[2] > 1:
-            # If model is Univariate (1 feature), keep only the first feature (Rainfall Lag 1)
-            X_ready = X_ready[:, :, 0:1]
-        
-        # E. Predict
-        y = model.predict(X_ready)
-        
-        # F. Inverse Transform Result
-        return max(0.0, float(target_scaler.inverse_transform(y)[0][0]))
+        return current_weather, pred_val
 
     except Exception as e:
-        st.error(f"Prediction logic error: {e}")
-        # Debugging info to help if it fails again
-        if 'X_ready' in locals():
-            st.write(f"Debug Info -> Input Shape: {X_ready.shape}, Model Expects: {model.input_shape}")
-        return 0.0
+        st.error(f"API/Prediction Error: {e}")
+        return None, 0.0
 
-def get_chatbot_response(msg):
+# ------------------------------------------------------
+# 🤖 CHATBOT BRAIN
+# ------------------------------------------------------
+def get_bot_response(msg, weather, crop_data):
     msg = msg.lower()
-    if "hello" in msg: return "Namaste! I am your Kisan Assistant. Ask about rain, crops, or fertilizers."
-    if "rice" in msg or "paddy" in msg: return "Rice needs standing water. If rain is predicted > 10mm, stop tube well irrigation."
-    if "wheat" in msg: return "Wheat is sensitive to waterlogging at the grain-filling stage. Ensure drainage."
-    if "rain" in msg: return "I use an LSTM AI model to analyze past weather and predict rain intensity."
-    return "I am learning. Please ask about 'Rice', 'Wheat', or 'Weather'."
+    rain = weather.get('pred_rain', 0.0)
+    crop = crop_data.get('crop', 'Crop')
+    
+    if "irrigate" in msg or "water" in msg:
+        if rain > 5.0: return f"🔴 **No!** Heavy rain ({rain:.1f}mm) is coming. Don't waste water."
+        if rain > 1.0: return f"🟡 **Wait.** Light rain ({rain:.1f}mm) expected. Check soil first."
+        return "🟢 **Yes.** Weather is clear. Good time to irrigate."
+        
+    if "spray" in msg or "pesticide" in msg:
+        wind = weather.get('wind', 0)
+        if rain > 0.5: return "🔴 **Don't Spray.** Rain will wash it away."
+        if wind > 15: return "⚠️ **Caution.** High wind might cause drift."
+        return "🟢 **Safe to spray.**"
+        
+    return f"I am tracking your **{crop}**. Ask me 'Should I irrigate?' or 'Can I spray?'"
 
 # ------------------------------------------------------
-# 🖥️ MAIN UI
+# 🖥️ UI LAYOUTS
 # ------------------------------------------------------
 
-# Sidebar
-st.sidebar.image("https://cdn-icons-png.flaticon.com/512/3025/3025528.png", width=100)
-st.sidebar.header("⚙️ Settings / सेटिंग्स")
+# --- SESSION STATE SETUP ---
+if "page" not in st.session_state: st.session_state.page = "landing"
+if "crop_data" not in st.session_state: st.session_state.crop_data = {}
+if "last_weather" not in st.session_state: st.session_state.last_weather = {}
+
+# --- SIDEBAR (Global) ---
+st.sidebar.image("https://cdn-icons-png.flaticon.com/512/3025/3025528.png", width=80)
 lang = st.sidebar.selectbox("Language / भाषा", ["English", "Hindi", "Punjabi"])
-city = st.sidebar.selectbox("Select Location", list(CITY_COORDS.keys()))
 t = TRANSLATIONS[lang]
 
-st.title(t["title"])
-
-# Navigation
-tab1, tab2, tab3, tab4 = st.tabs([t["live_tab"], t["crop_tab"], t["chat_tab"], t["hist_tab"]])
-
-# --- TAB 1: LIVE DASHBOARD ---
-with tab1:
-    if model is None:
-        st.error("🚨 Model files not found! Please upload .h5 and .pkl files.")
-    else:
-        weather = fetch_weather_with_history(city)
-        if weather:
-            pred_rain = predict_rain(weather)
-            
-            # TRAFFIC LIGHT ADVISORY
-            st.write("---")
-            if pred_rain > 5.0:
-                st.error(f"🔴 **{t['advice_danger']}**")
-            elif pred_rain > 0.5:
-                st.warning(f"🟡 **{t['advice_caution']}**")
-            else:
-                st.success(f"🟢 **{t['advice_safe']}**")
-            st.write("---")
-
-            # Metrics
-            c1, c2, c3, c4 = st.columns(4)
-            c1.metric(t["rain_label"], f"{pred_rain:.2f} mm")
-            c2.metric(t["humidity"], f"{weather['humidity']}%")
-            c3.metric(t["temp"], f"{weather['temparature']} °C")
-            c4.metric(t["wind"], f"{weather['windspeed']} km/h")
-            
-            # Store for other tabs
-            st.session_state['last_rain'] = pred_rain
-        else:
-            st.warning("Could not fetch weather data. Check internet.")
-
-# --- TAB 2: CROP MONITOR ---
-with tab2:
-    st.subheader(f"{t['crop_tab']}")
-    c1, c2 = st.columns([1, 2])
+# --- PAGE 1: LANDING ---
+def render_landing():
+    st.markdown(f"<h1 style='text-align: center;'>{t['welcome']}</h1>", unsafe_allow_html=True)
+    st.markdown(f"<p style='text-align: center;'>{t['enter_details']}</p>", unsafe_allow_html=True)
     
-    with c1:
-        s_crop = st.selectbox("Select Crop", list(CROP_INFO.keys()))
-        s_date = st.date_input("Sowing Date", dt.date.today() - dt.timedelta(days=30))
-        
-        days_age = (dt.date.today() - s_date).days
-        st.info(f"📅 Crop Age: **{days_age} Days**")
-        
-    with c2:
-        if days_age >= 0:
-            c_data = CROP_INFO[s_crop]
-            stage = "Unknown"
-            prog = 0.0
-            for start, end, name in c_data["stages"]:
-                if start <= days_age <= end:
-                    stage = name
-                    prog = min(1.0, (days_age - start) / (end - start + 1))
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        with st.form("onboard"):
+            name = st.text_input("Farmer Name", "Ram Singh")
+            crop = st.selectbox("Select Crop / फसल", list(CROP_INFO.keys()))
+            date = st.date_input("Sowing Date / बुवाई की तारीख", dt.date.today() - dt.timedelta(days=30))
+            city = st.selectbox("Location / स्थान", list(CITY_COORDS.keys()))
             
-            if days_age > c_data["duration_days"]: stage = "Harvested/Finished"
-            
-            st.markdown(f"### 🌾 Stage: {stage}")
-            # Visual progress bar logic
-            st.progress(min(1.0, days_age / c_data["duration_days"]), text="Lifecycle Progress")
+            if st.form_submit_button(t["generate"]):
+                st.session_state.crop_data = {"name": name, "crop": crop, "sowing_date": date, "city": city}
+                st.session_state.page = "dashboard"
+                st.rerun()
 
-            # SMART ADVICE
-            rain_val = st.session_state.get('last_rain', 0.0)
-            
-            st.markdown("#### 🧠 AI Farmer Advice")
-            if c_data["critical_rain_stage"] in stage and rain_val > 2.0:
-                 st.error(f"⚠️ **DANGER:** Rain predicted during {stage}! Check drainage immediately.")
-            elif rain_val < 1.0 and c_data["water_needs"] == "High":
-                 st.info("💧 **Irrigation:** Soil moisture low. You can irrigate today.")
-            else:
-                 st.success("✅ **Status:** Crop conditions are stable.")
+# --- PAGE 2: DASHBOARD ---
+def render_dashboard():
+    data = st.session_state.crop_data
+    
+    # Header
+    c1, c2 = st.columns([3, 1])
+    c1.title(f"🚜 {data['name']}'s Farm")
+    if c2.button("🔄 Change Crop"):
+        st.session_state.page = "landing"
+        st.rerun()
 
-# --- TAB 3: CHATBOT ---
-with tab3:
-    st.subheader(t["chat_tab"])
-    if "messages" not in st.session_state:
-        st.session_state.messages = [{"role": "assistant", "content": "Sat Sri Akal! How can I help your farm today?"}]
+    # Get Data
+    weather, pred_rain = fetch_weather_and_predict(data["city"])
+    if weather: 
+        weather['pred_rain'] = pred_rain
+        st.session_state.last_weather = weather
+    
+    # CROP CALCULATIONS
+    crop_conf = CROP_INFO[data["crop"]]
+    days_age = (dt.date.today() - data["sowing_date"]).days
+    
+    # Determine Stage
+    current_stage = "Unknown"
+    for s, e, n in crop_conf["stages"]:
+        if s <= days_age <= e: current_stage = n; break
+    if days_age > crop_conf["duration_days"]: current_stage = "Harvest Ready"
 
-    for msg in st.session_state.messages:
-        st.chat_message(msg["role"]).write(msg["content"])
+    # --- KPI ROW ---
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("🌱 Age", f"{days_age} Days")
+    k2.metric("📍 Stage", current_stage)
+    days_left = max(0, crop_conf["duration_days"] - days_age)
+    k3.metric("🚜 Harvest In", f"{days_left} Days")
+    k4.metric("💧 Next Water", "2 Days" if pred_rain < 2 else "Not Needed")
 
-    if prompt := st.chat_input("Ask about weather, crops..."):
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        st.chat_message("user").write(prompt)
+    st.markdown("---")
+
+    # --- TABS ---
+    tab1, tab2, tab3, tab4 = st.tabs([t["tab_live"], t["tab_crop"], t["tab_chat"], t["tab_log"]])
+
+    # TAB 1: WEATHER & TRAFFIC LIGHT
+    with tab1:
+        st.subheader("Live Advisory")
         
-        resp = get_chatbot_response(prompt)
-        st.session_state.messages.append({"role": "assistant", "content": resp})
-        st.chat_message("assistant").write(resp)
+        # Traffic Light Logic
+        if pred_rain > 5.0:
+            st.markdown(f"""<div class='traffic-red'><h2>🚫 STOP</h2><p>Heavy Rain ({pred_rain:.1f}mm). Do not spray or irrigate.</p></div>""", unsafe_allow_html=True)
+        elif pred_rain > 0.5:
+            st.markdown(f"""<div class='traffic-yellow'><h2>⚠️ CAUTION</h2><p>Light Rain ({pred_rain:.1f}mm). Delay sensitive tasks.</p></div>""", unsafe_allow_html=True)
+        else:
+            st.markdown(f"""<div class='traffic-green'><h2>🟢 GO</h2><p>Clear weather. Safe for farm operations.</p></div>""", unsafe_allow_html=True)
 
-# --- TAB 4: HISTORY ---
-with tab4:
-    st.subheader(t["hist_tab"])
-    try:
-        df_hist = pd.read_csv("Synthetic_Rainfall_Dataset_1100.csv")
-        st.line_chart(df_hist["rainfall"]) # Simple chart for speed
-    except:
-        st.warning("Historical CSV file not found.")
+        st.write("")
+        # Metric Cards
+        m1, m2, m3, m4 = st.columns(4)
+        if weather:
+            m1.metric("Rainfall", f"{pred_rain:.1f} mm")
+            m2.metric("Humidity", f"{weather['hum']}%")
+            m3.metric("Wind", f"{weather['wind']} km/h")
+            m4.metric("Temp", f"{weather['temp']} °C")
+
+    # TAB 2: CROP VISUALS
+    with tab2:
+        c1, c2 = st.columns([2, 1])
+        with c1:
+            st.subheader("Growth Trajectory")
+            # S-Curve Visualization
+            x = list(range(0, crop_conf["duration_days"] + 1, 5))
+            y = [100 / (1 + np.exp(-0.1 * (i - crop_conf["duration_days"]/2))) for i in x]
+            
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(x=x, y=y, name="Ideal Growth", line=dict(color='green', dash='dot')))
+            # Current Point
+            curr_y = 100 / (1 + np.exp(-0.1 * (days_age - crop_conf["duration_days"]/2)))
+            fig.add_trace(go.Scatter(x=[days_age], y=[curr_y], mode='markers', marker=dict(color='red', size=15), name="You are here"))
+            
+            fig.update_layout(height=300, margin=dict(l=20, r=20, t=20, b=20), xaxis_title="Days", yaxis_title="% Growth")
+            st.plotly_chart(fig, use_container_width=True)
+
+        with c2:
+            st.subheader("Visual Guide")
+            # Placeholder for visual reference st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/3/3d/Wheat_growth_stages.png/320px-Wheat_growth_stages.png", caption="Wheat Stages Reference")
+            st.info(f"Current Phase: **{current_stage}**")
+
+    # TAB 3: CHATBOT
+    with tab3:
+        st.subheader("🤖 Kisan Assistant")
+        if "messages" not in st.session_state: 
+            st.session_state.messages = [{"role": "assistant", "content": "Sat Sri Akal! Ask me about irrigation or spraying."}]
+        
+        for msg in st.session_state.messages:
+            st.chat_message(msg["role"]).write(msg["content"])
+            
+        if prompt := st.chat_input("Ask a question..."):
+            st.chat_message("user").write(prompt)
+            st.session_state.messages.append({"role": "user", "content": prompt})
+            
+            # Smart Response
+            resp = get_bot_response(prompt, st.session_state.last_weather, st.session_state.crop_data)
+            
+            st.chat_message("assistant").write(resp)
+            st.session_state.messages.append({"role": "assistant", "content": resp})
+
+    # TAB 4: LOGS
+    with tab4:
+        st.subheader("📖 Farm Journal")
+        note = st.text_area("Add a note", placeholder="e.g., Applied Urea today...")
+        if st.button("Save Note"):
+            st.success("Note saved to local log.")
+
+# --- MAIN ROUTER ---
+if st.session_state.page == "landing":
+    render_landing()
+else:
+    render_dashboard()
