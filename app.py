@@ -85,38 +85,67 @@ def fetch_live_weather(city: str):
         return None
 
 # ------------------------------------------------------
-# 🤖 PREDICTION FUNCTION
+# 🤖 PREDICTION FUNCTION (FIXED)
 # ------------------------------------------------------
 def predict_rainfall(live_data: dict):
     """Make rainfall prediction using trained LSTM model with feature alignment."""
     df_live = pd.DataFrame([live_data])
 
-    # Handle missing engineered features from training phase
-    expected_features = [
-        "humidity_lag_1", "humidity_rolling_3", "cloud_rolling_3",
-        "dayofweek", "month", "temparature", "windspeed", "cloud", "humidity"
-    ]
-
-    # Generate dummy / approximated engineered features
+    # 1. Engineered features (Must match training logic)
     df_live["humidity_lag_1"] = df_live["humidity"]
     df_live["humidity_rolling_3"] = df_live["humidity"]
     df_live["cloud_rolling_3"] = df_live["cloud"]
     df_live["dayofweek"] = dt.datetime.now().weekday()
     df_live["month"] = dt.datetime.now().month
 
-    # Keep only the features present in the scaler
-    try:
-        valid_features = [f for f in expected_features if f in feature_scaler.feature_names_in_]
-        X_live = df_live[valid_features]
-    except Exception:
-        X_live = df_live.select_dtypes(include=[np.number])
+    # 2. Define the EXACT feature order used in training
+    # IMPORTANT: 'winddirection' is excluded here because it wasn't in your training list
+    train_features = [
+        "humidity_lag_1", 
+        "humidity_rolling_3", 
+        "cloud_rolling_3",
+        "dayofweek", 
+        "month", 
+        "temparature", 
+        "windspeed", 
+        "cloud", 
+        "humidity"
+    ]
 
-    # Transform safely (ignore feature name check)
+    # 3. Attempt to auto-detect features from the scaler if possible
+    try:
+        if hasattr(feature_scaler, "n_features_in_"):
+             # DEBUG: Show what the scaler wants on the screen
+            expected_count = feature_scaler.n_features_in_
+            st.write(f"🔍 **Debug:** Scaler expects {expected_count} features.")
+            
+            # If the scaler saved feature names, use them
+            if hasattr(feature_scaler, "feature_names_in_"):
+                train_features = list(feature_scaler.feature_names_in_)
+                st.write(f"📋 **Debug:** Using feature names from scaler: {train_features}")
+    except Exception as e:
+        st.warning(f"Could not detect scaler features: {e}")
+
+    # 4. Select only the required columns
+    try:
+        X_live = df_live[train_features]
+        
+        # DEBUG: Check shape before scaling
+        st.write(f"🔢 **Debug:** Input shape being sent to scaler: {X_live.shape}")
+        
+        if X_live.shape[1] != feature_scaler.n_features_in_:
+             st.error(f"🚨 **Mismatch:** You provided {X_live.shape[1]} features, but scaler wants {feature_scaler.n_features_in_}.")
+
+    except KeyError as e:
+        st.error(f"Missing column in live data: {e}")
+        return 0.0
+
+    # 5. Transform
     X_scaled = feature_scaler.transform(X_live.to_numpy().reshape(1, -1))
     X_scaled = X_scaled.reshape((1, X_scaled.shape[1], 1))
+    
     y_pred = model.predict(X_scaled)
     return float(target_scaler.inverse_transform(y_pred)[0][0])
-
 # ------------------------------------------------------
 # 📊 LOAD HISTORICAL DATA
 # ------------------------------------------------------
