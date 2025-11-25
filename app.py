@@ -180,22 +180,15 @@ def predict_rain(data):
     df["dayofweek"] = dt.datetime.now().weekday()
     df["month"] = dt.datetime.now().month
     
-    # 2. Map to Scaler Feature Names (Strict Order)
-    # Check feature_scaler.feature_names_in_ if you get an error
-    features = [
-        'rain_l1', 'rain_l3', 'rain_l7', 'hum_l1', 'wind_l1', 'temp_l1',
-        'rain_r3', 'hum_r3', 'cloud_r3', 'month', 'dayofweek'
-    ]
-    
-    # Renaming dictionary to match typical scaler names if needed
-    # (Adjust keys based on your training data names)
+    # 2. Rename columns to match Scaler's expected names
+    # Note: 'temparature' is kept as per your previous scaler keys
     input_data = df.rename(columns={
         "rain_l1": "rainfall_lag_1", "rain_l3": "rainfall_lag_3", "rain_l7": "rainfall_lag_7",
         "hum_l1": "humidity_lag_1", "wind_l1": "windspeed_lag_1", "temp_l1": "temparature_lag_1",
         "rain_r3": "rainfall_rolling_3", "hum_r3": "humidity_rolling_3", "cloud_r3": "cloud_rolling_3"
     })
     
-    # Hardcoded list matching the likely training order
+    # 3. Define the strict column order for the Scaler (11 features)
     final_cols = [
         "rainfall_lag_1", "rainfall_lag_3", "rainfall_lag_7",
         "humidity_lag_1", "windspeed_lag_1", "temparature_lag_1",
@@ -204,12 +197,38 @@ def predict_rain(data):
     ]
     
     try:
-        X = input_data[final_cols].to_numpy().reshape(1, -1)
-        X_scaled = feature_scaler.transform(X).reshape(1, 1, 11)
-        y = model.predict(X_scaled)
+        # A. Select columns and Shape for Scaler: (1 sample, 11 features)
+        X_raw = input_data[final_cols].to_numpy().reshape(1, -1)
+        
+        # B. Scale the data (Scaler expects 11 features)
+        X_scaled = feature_scaler.transform(X_raw)
+        
+        # C. Reshape for LSTM: (1 sample, 1 timestep, 11 features)
+        X_ready = X_scaled.reshape(1, 1, 11)
+        
+        # 🛑 D. CRITICAL FIX: Handle Feature Mismatch 🛑
+        # The error said model expects 1 feature, but we have 11.
+        # We check the model's input shape dynamically.
+        
+        # Get expected features (last dimension of input shape)
+        # model.input_shape is usually (None, Timesteps, Features)
+        expected_features = model.input_shape[-1]
+        
+        if expected_features == 1 and X_ready.shape[2] > 1:
+            # If model is Univariate (1 feature), keep only the first feature (Rainfall Lag 1)
+            X_ready = X_ready[:, :, 0:1]
+        
+        # E. Predict
+        y = model.predict(X_ready)
+        
+        # F. Inverse Transform Result
         return max(0.0, float(target_scaler.inverse_transform(y)[0][0]))
+
     except Exception as e:
-        st.error(f"Prediction logic mismatch: {e}")
+        st.error(f"Prediction logic error: {e}")
+        # Debugging info to help if it fails again
+        if 'X_ready' in locals():
+            st.write(f"Debug Info -> Input Shape: {X_ready.shape}, Model Expects: {model.input_shape}")
         return 0.0
 
 def get_chatbot_response(msg):
