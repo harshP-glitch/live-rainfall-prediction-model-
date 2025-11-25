@@ -8,6 +8,27 @@ import joblib
 import time
 from tensorflow.keras.models import load_model
 
+# Paste this inside your st.markdown at the top of the app
+st.markdown("""
+    <style>
+    /* Bigger font for mobile readability */
+    .stMarkdown p { font-size: 18px !important; }
+    
+    /* Make metrics look like cards */
+    div[data-testid="stMetric"] {
+        background-color: #f0f2f6;
+        padding: 15px;
+        border-radius: 10px;
+        border: 1px solid #d1d5db;
+    }
+    
+    /* Hide the default Streamlit menu to make it look like a native app */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    </style>
+""", unsafe_allow_html=True)
+
+
 # ------------------------------------------------------
 # 🧱 PAGE CONFIGURATION
 # ------------------------------------------------------
