@@ -308,10 +308,7 @@ def render_dashboard():
         c1, c2 = st.columns([2, 1])
         with c1:
             st.subheader("Growth Trajectory")
-            
-
-[Image of crop growth stages timeline]
-
+            # S-Curve Growth Logic
             x = list(range(0, crop_conf["duration_days"] + 1, 5))
             y = [100 / (1 + np.exp(-0.1 * (i - crop_conf["duration_days"]/2))) for i in x]
             
