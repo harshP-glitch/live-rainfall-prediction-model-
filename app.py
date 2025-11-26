@@ -11,7 +11,7 @@ import random
 from tensorflow.keras.models import load_model
 
 # ------------------------------------------------------
-# 1. 🧱 PAGE CONFIG & CSS (Dark Mode Fix)
+# 1. 🧱 PAGE CONFIG & CSS
 # ------------------------------------------------------
 st.set_page_config(
     page_title="Kisan Farm OS",
@@ -29,7 +29,7 @@ st.markdown("""
         padding: 15px;
         border-radius: 10px;
     }
-    /* Force Text to Black for readability */
+    /* Force Text to Black */
     div[data-testid="stMetricLabel"] p { color: #31333F !important; font-weight: bold; }
     div[data-testid="stMetricValue"] div { color: #000000 !important; }
 
@@ -41,7 +41,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ------------------------------------------------------
-# 2. 💾 SELF-LEARNING DATABASE (SQLite)
+# 2. 💾 DATABASE & NOTIFICATION SYSTEM
 # ------------------------------------------------------
 conn = sqlite3.connect('farm_data.db', check_same_thread=False)
 c = conn.cursor()
@@ -50,14 +50,22 @@ c.execute('''CREATE TABLE IF NOT EXISTS feedback
 conn.commit()
 
 def save_feedback(city, pred, actual):
-    """Saves ground truth data for future model retraining."""
     err = abs(pred - actual)
     c.execute("INSERT INTO feedback VALUES (?, ?, ?, ?, ?)", 
               (dt.datetime.now(), city, pred, actual, err))
     conn.commit()
 
+def send_alert(phone, msg, channel="SMS"):
+    """
+    Simulates sending a real SMS/WhatsApp.
+    In production, replace print() with Twilio/Gupshup API calls.
+    """
+    time.sleep(1) # Simulate network delay
+    # st.toast shows a popup notification in the app
+    st.toast(f"🔔 {channel} sent to {phone}: {msg}", icon="📲")
+
 # ------------------------------------------------------
-# 3. ⚙️ LOAD RESOURCES & CONFIG
+# 3. ⚙️ CONFIGURATION
 # ------------------------------------------------------
 CROP_INFO = {
     "Wheat": {"duration": 140, "stages": [(0,20,"Germination"), (21,60,"Tillering"), (61,90,"Flowering"), (91,140,"Ripening")]},
@@ -85,10 +93,10 @@ def load_resources():
 model, feature_scaler, target_scaler = load_resources()
 
 # ------------------------------------------------------
-# 4. 🧠 CORE FUNCTIONS
+# 4. 🧠 INTELLIGENCE LAYER
 # ------------------------------------------------------
 
-# A. LSTM WEATHER PREDICTION
+# A. LSTM WEATHER
 def fetch_weather_and_predict(city):
     if not model: return None, 0.0
     lat, lon = CITY_COORDS.get(city, (30.7046, 76.7179))
@@ -112,7 +120,6 @@ def fetch_weather_and_predict(city):
             "wind": df.loc[idx, "wind"], "cloud": df.loc[idx, "cloud"]
         }
         
-        # LSTM Features (Strict Order)
         def val(i, c): return df.loc[i, c] if i >= 0 else 0.0
         features = [
             val(idx-1, "rain"), val(idx-3, "rain"), val(idx-7, "rain"),
@@ -124,13 +131,13 @@ def fetch_weather_and_predict(city):
         ]
         
         X_scaled = feature_scaler.transform(np.array(features).reshape(1, -1)).reshape(1, 1, 11)
-        if model.input_shape[-1] == 1: X_scaled = X_scaled[:, :, 0:1] # Fix dim mismatch
+        if model.input_shape[-1] == 1: X_scaled = X_scaled[:, :, 0:1]
         
         y = model.predict(X_scaled)
         pred_val = max(0.0, float(target_scaler.inverse_transform(y)[0][0]))
         return current_weather, pred_val
 
-    except Exception as e:
+    except:
         return None, 0.0
 
 # B. SIMULATIONS
@@ -155,16 +162,17 @@ def get_bot_response(msg, rain, crop):
     return f"I am managing your {crop}. Ask me about prices, weather, or health."
 
 # ------------------------------------------------------
-# 5. 🖥️ UI LAYOUT
+# 5. 🖥️ USER INTERFACE
 # ------------------------------------------------------
 
 if "page" not in st.session_state: st.session_state.page = "landing"
 if "data" not in st.session_state: st.session_state.data = {}
+if "alerts" not in st.session_state: st.session_state.alerts = {"phone": "", "active": False}
 
-# --- LANDING PAGE ---
+# --- PAGE 1: LANDING ---
 if st.session_state.page == "landing":
     st.markdown("<h1 style='text-align: center;'>🚜 Kisan Farm OS</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center;'>One-Stop Solution: Weather • Health • Markets</p>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center;'>Smart Farming: Weather • Health • Markets • Alerts</p>", unsafe_allow_html=True)
     
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
@@ -175,38 +183,61 @@ if st.session_state.page == "landing":
             city = st.selectbox("Nearest City", list(CITY_COORDS.keys()))
             sowing = st.date_input("Sowing Date", dt.date.today() - dt.timedelta(days=45))
             
+            st.markdown("---")
+            st.write("🔔 **Get Alerts**")
+            phone = st.text_input("Phone Number (Optional)", placeholder="+91 98765 43210")
+            enable_alerts = st.checkbox("Send me SMS alerts for heavy rain")
+            
             if st.form_submit_button("🚀 Launch Dashboard"):
                 st.session_state.data = {"name": name, "crop": crop, "city": city, "sowing": sowing}
+                st.session_state.alerts = {"phone": phone, "active": enable_alerts}
                 st.session_state.page = "dashboard"
                 st.rerun()
 
-# --- MAIN DASHBOARD ---
+# --- PAGE 2: DASHBOARD ---
 else:
     data = st.session_state.data
+    alerts = st.session_state.alerts
     crop_conf = CROP_INFO[data["crop"]]
     
+    # SIDEBAR
     st.sidebar.title("🚜 Farm OS")
     st.sidebar.info(f"👤 **{data['name']}**\n\n📍 {data['city']}\n\n🌾 {data['crop']}")
+    
+    # Alert Status in Sidebar
+    if alerts["active"]:
+        st.sidebar.success(f"🔔 Alerts Active\n\n{alerts['phone']}")
+    else:
+        st.sidebar.warning("🔕 Alerts Off")
+
     if st.sidebar.button("Log Out"): 
         st.session_state.page = "landing"
         st.rerun()
 
+    # DATA FETCH
     weather, pred_rain = fetch_weather_and_predict(data["city"])
     days_age = (dt.date.today() - data["sowing"]).days
 
+    # TABS
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
-        "🌦️ Weather & Learning", 
+        "🌦️ Weather & Alerts", 
         "🌾 Crop Health", 
         "🏥 Plant Doctor", 
         "💰 Mandi Prices", 
         "💬 Assistant"
     ])
 
-    # --- TAB 1: WEATHER & FEEDBACK ---
+    # --- TAB 1: WEATHER & ALERTS ---
     with tab1:
         st.subheader("Live Forecast & Advisory")
+        
+        # Traffic Light Logic + ALERT TRIGGER
         if pred_rain > 5.0:
             st.markdown(f"<div class='traffic-red'><h2>🚫 STOP WORK</h2><p>Heavy Rain ({pred_rain:.1f}mm) Predicted.</p></div>", unsafe_allow_html=True)
+            # 🚨 TRIGGER ALERT
+            if alerts["active"]:
+                send_alert(alerts["phone"], f"⚠️ ALERT: Heavy rain ({pred_rain:.1f}mm) expected in {data['city']}. Stop irrigation.", "SMS")
+        
         elif pred_rain > 1.0:
             st.markdown(f"<div class='traffic-yellow'><h2>⚠️ CAUTION</h2><p>Light Rain ({pred_rain:.1f}mm). Delay Spraying.</p></div>", unsafe_allow_html=True)
         else:
@@ -222,13 +253,13 @@ else:
         
         st.markdown("---")
         with st.expander("🧠 Teach the Model (Self-Learning)"):
-            st.write("Is the prediction incorrect? Tell us the truth so the model learns.")
-            actual_rain = st.number_input("Actual Rainfall Observed (mm):", 0.0, 100.0)
+            st.write("Help us improve. What is the ACTUAL rain today?")
+            actual_rain = st.number_input("Observed Rain (mm):", 0.0, 100.0)
             if st.button("Submit Feedback"):
                 save_feedback(data["city"], pred_rain, actual_rain)
-                st.success("✅ Feedback Saved! The model will be retrained with this data.")
+                st.success("✅ Feedback Saved! Model will learn from this.")
 
-    # --- TAB 2: CROP HEALTH VISUALS ---
+    # --- TAB 2: CROP HEALTH ---
     with tab2:
         st.subheader(f"{data['crop']} Growth Trajectory")
         c1, c2 = st.columns([2, 1])
@@ -243,7 +274,7 @@ else:
             fig.update_layout(height=300, xaxis_title="Days", yaxis_title="% Growth", margin=dict(l=20,r=20,t=20,b=20))
             st.plotly_chart(fig, use_container_width=True)
             
-            # FIXED LINE: Uses a real image URL instead of placeholder text
+            # Using real image URL for visual reference
             st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/3/3d/Wheat_growth_stages.png/320px-Wheat_growth_stages.png", caption="Crop Stages Reference")
 
         with c2:
@@ -257,16 +288,15 @@ else:
     # --- TAB 3: PLANT DOCTOR ---
     with tab3:
         st.subheader("📸 AI Plant Doctor")
-        st.write("Upload a photo of a sick leaf to identify diseases.")
         img = st.file_uploader("Upload Image", type=['jpg', 'png'])
         if img:
             st.image(img, width=250, caption="Uploaded Leaf")
             if st.button("Diagnose Disease"):
-                with st.spinner("Analyzing leaf patterns..."):
+                with st.spinner("Analyzing..."):
                     disease, conf = diagnose_plant(img)
                 st.success(f"**Diagnosis:** {disease}")
                 if "Healthy" not in disease:
-                    st.warning("💊 **Recommendation:** Apply Propiconazole 25% EC (1ml/liter water).")
+                    st.warning("💊 **Recommendation:** Apply Propiconazole 25% EC.")
 
     # --- TAB 4: MARKET PRICES ---
     with tab4:
@@ -281,7 +311,7 @@ else:
         if "messages" not in st.session_state: st.session_state.messages = []
         for msg in st.session_state.messages:
             st.chat_message(msg["role"]).write(msg["content"])
-        if prompt := st.chat_input("Ask about weather, prices, or disease..."):
+        if prompt := st.chat_input("Ask question..."):
             st.chat_message("user").write(prompt)
             st.session_state.messages.append({"role": "user", "content": prompt})
             resp = get_bot_response(prompt, pred_rain, data["crop"])
