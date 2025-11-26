@@ -43,7 +43,6 @@ st.markdown("""
 # ------------------------------------------------------
 # 2. 💾 SELF-LEARNING DATABASE (SQLite)
 # ------------------------------------------------------
-# Creates a local file 'farm_data.db' to store farmer feedback
 conn = sqlite3.connect('farm_data.db', check_same_thread=False)
 c = conn.cursor()
 c.execute('''CREATE TABLE IF NOT EXISTS feedback 
@@ -86,7 +85,7 @@ def load_resources():
 model, feature_scaler, target_scaler = load_resources()
 
 # ------------------------------------------------------
-# 4. 🧠 CORE FUNCTIONS (Weather, Health, Market)
+# 4. 🧠 CORE FUNCTIONS
 # ------------------------------------------------------
 
 # A. LSTM WEATHER PREDICTION
@@ -113,7 +112,7 @@ def fetch_weather_and_predict(city):
             "wind": df.loc[idx, "wind"], "cloud": df.loc[idx, "cloud"]
         }
         
-        # Lags logic for LSTM
+        # LSTM Features (Strict Order)
         def val(i, c): return df.loc[i, c] if i >= 0 else 0.0
         features = [
             val(idx-1, "rain"), val(idx-3, "rain"), val(idx-7, "rain"),
@@ -134,13 +133,12 @@ def fetch_weather_and_predict(city):
     except Exception as e:
         return None, 0.0
 
-# B. PLANT DOCTOR SIMULATION
+# B. SIMULATIONS
 def diagnose_plant(img):
-    time.sleep(1.5) # Simulate AI processing time
-    diseases = ["Yellow Rust (Need Fungicide)", "Leaf Blight", "Healthy Crop", "Nitrogen Deficiency"]
+    time.sleep(1.5)
+    diseases = ["Yellow Rust", "Leaf Blight", "Healthy Crop", "Nitrogen Deficiency"]
     return random.choice(diseases), random.uniform(88, 99)
 
-# C. MANDI PRICE SIMULATION
 def get_market_prices(crop):
     base = 2275 if crop == "Wheat" else 3100
     return pd.DataFrame([
@@ -149,7 +147,6 @@ def get_market_prices(crop):
         {"Mandi": "Private Trader", "Price (₹/Q)": base - 20, "Trend": "⬇️ Low"},
     ])
 
-# D. CHATBOT BRAIN
 def get_bot_response(msg, rain, crop):
     msg = msg.lower()
     if "price" in msg: return f"The current trend for {crop} is stable around ₹2200/Q."
@@ -158,10 +155,9 @@ def get_bot_response(msg, rain, crop):
     return f"I am managing your {crop}. Ask me about prices, weather, or health."
 
 # ------------------------------------------------------
-# 5. 🖥️ UI LAYOUT & LOGIC
+# 5. 🖥️ UI LAYOUT
 # ------------------------------------------------------
 
-# Session State
 if "page" not in st.session_state: st.session_state.page = "landing"
 if "data" not in st.session_state: st.session_state.data = {}
 
@@ -189,18 +185,15 @@ else:
     data = st.session_state.data
     crop_conf = CROP_INFO[data["crop"]]
     
-    # Sidebar
     st.sidebar.title("🚜 Farm OS")
     st.sidebar.info(f"👤 **{data['name']}**\n\n📍 {data['city']}\n\n🌾 {data['crop']}")
     if st.sidebar.button("Log Out"): 
         st.session_state.page = "landing"
         st.rerun()
 
-    # Fetch Real Data
     weather, pred_rain = fetch_weather_and_predict(data["city"])
     days_age = (dt.date.today() - data["sowing"]).days
 
-    # MAIN TABS
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
         "🌦️ Weather & Learning", 
         "🌾 Crop Health", 
@@ -212,8 +205,6 @@ else:
     # --- TAB 1: WEATHER & FEEDBACK ---
     with tab1:
         st.subheader("Live Forecast & Advisory")
-        
-        # Traffic Light
         if pred_rain > 5.0:
             st.markdown(f"<div class='traffic-red'><h2>🚫 STOP WORK</h2><p>Heavy Rain ({pred_rain:.1f}mm) Predicted.</p></div>", unsafe_allow_html=True)
         elif pred_rain > 1.0:
@@ -222,7 +213,6 @@ else:
             st.markdown(f"<div class='traffic-green'><h2>🟢 GO AHEAD</h2><p>Clear Weather. Safe for Irrigation/Spray.</p></div>", unsafe_allow_html=True)
 
         st.write("")
-        # Metrics
         m1, m2, m3, m4 = st.columns(4)
         if weather:
             m1.metric("Rainfall", f"{pred_rain:.1f} mm")
@@ -231,7 +221,6 @@ else:
             m4.metric("Wind", f"{weather['wind']} km/h")
         
         st.markdown("---")
-        # SELF LEARNING SECTION
         with st.expander("🧠 Teach the Model (Self-Learning)"):
             st.write("Is the prediction incorrect? Tell us the truth so the model learns.")
             actual_rain = st.number_input("Actual Rainfall Observed (mm):", 0.0, 100.0)
@@ -244,7 +233,6 @@ else:
         st.subheader(f"{data['crop']} Growth Trajectory")
         c1, c2 = st.columns([2, 1])
         with c1:
-            # S-Curve Chart
             x = list(range(0, crop_conf["duration"] + 1, 5))
             y = [100 / (1 + np.exp(-0.1 * (i - crop_conf["duration"]/2))) for i in x]
             curr_y = 100 / (1 + np.exp(-0.1 * (days_age - crop_conf["duration"]/2)))
@@ -255,15 +243,11 @@ else:
             fig.update_layout(height=300, xaxis_title="Days", yaxis_title="% Growth", margin=dict(l=20,r=20,t=20,b=20))
             st.plotly_chart(fig, use_container_width=True)
             
-            # Contextual Image
-            st.markdown("
-
-[Image of crop growth stages timeline]
-")
+            # FIXED LINE: Uses a real image URL instead of placeholder text
+            st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/3/3d/Wheat_growth_stages.png/320px-Wheat_growth_stages.png", caption="Crop Stages Reference")
 
         with c2:
             st.info(f"📅 **Day {days_age}** of {crop_conf['duration']}")
-            # Determine Stage
             curr_stage = "Harvested"
             for s, e, n in crop_conf["stages"]:
                 if s <= days_age <= e: curr_stage = n
@@ -274,7 +258,6 @@ else:
     with tab3:
         st.subheader("📸 AI Plant Doctor")
         st.write("Upload a photo of a sick leaf to identify diseases.")
-        
         img = st.file_uploader("Upload Image", type=['jpg', 'png'])
         if img:
             st.image(img, width=250, caption="Uploaded Leaf")
@@ -282,32 +265,25 @@ else:
                 with st.spinner("Analyzing leaf patterns..."):
                     disease, conf = diagnose_plant(img)
                 st.success(f"**Diagnosis:** {disease}")
-                st.info(f"**Confidence:** {conf:.1f}%")
                 if "Healthy" not in disease:
                     st.warning("💊 **Recommendation:** Apply Propiconazole 25% EC (1ml/liter water).")
 
     # --- TAB 4: MARKET PRICES ---
     with tab4:
         st.subheader("💰 Live Mandi Prices")
-        st.caption("Real-time rates from nearby markets.")
         df_prices = get_market_prices(data["crop"])
         st.dataframe(df_prices, use_container_width=True)
-        st.line_chart([2200, 2250, 2220, 2280, 2300]) # Dummy trend
-        st.caption("Price Trend (Last 5 Days)")
+        st.line_chart([2200, 2250, 2220, 2280, 2300])
 
     # --- TAB 5: CHATBOT ---
     with tab5:
         st.subheader("🤖 Kisan Assistant")
         if "messages" not in st.session_state: st.session_state.messages = []
-        
         for msg in st.session_state.messages:
             st.chat_message(msg["role"]).write(msg["content"])
-            
         if prompt := st.chat_input("Ask about weather, prices, or disease..."):
             st.chat_message("user").write(prompt)
             st.session_state.messages.append({"role": "user", "content": prompt})
-            
             resp = get_bot_response(prompt, pred_rain, data["crop"])
-            
             st.chat_message("assistant").write(resp)
             st.session_state.messages.append({"role": "assistant", "content": resp})
