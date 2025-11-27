@@ -57,20 +57,30 @@ def text_to_speech(text, lang='en'):
         st.error(f"Audio Error: {e}")
 
 def recognize_speech():
-    """Listens to the microphone and returns text."""
+    """Listens to the microphone (Local Only). Disables safely on Cloud."""
     r = sr.Recognizer()
+    try:
+        # We check if PyAudio is importable before trying to open the mic
+        import pyaudio
+    except ImportError:
+        st.warning("⚠️ Voice Input is disabled on Cloud Deployment. (Server cannot access your microphone).")
+        st.info("💡 To test Voice Input, run this app locally on your laptop.")
+        return None
+
     try:
         with sr.Microphone() as source:
             st.toast("🎤 Listening... Speak now!", icon="👂")
+            # Adjust for ambient noise to improve accuracy
+            r.adjust_for_ambient_noise(source)
             audio = r.listen(source, timeout=5)
             text = r.recognize_google(audio)
             return text
     except sr.RequestError:
-        st.error("Internet required for voice recognition.")
+        st.error("Internet connection required for voice recognition.")
     except sr.UnknownValueError:
         st.warning("Could not understand audio. Try again.")
     except Exception as e:
-        st.error(f"Microphone Error: {e} (Ensure PyAudio is installed)")
+        st.error(f"Microphone Error: {e}")
     return None
 
 # ------------------------------------------------------
