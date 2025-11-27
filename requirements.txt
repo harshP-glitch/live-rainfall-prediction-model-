@@ -11,3 +11,5 @@ plotly
 huggingface_hub
 requests
 gtts
+SpeechRecognition
+pyaudio
