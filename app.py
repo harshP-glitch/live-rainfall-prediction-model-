@@ -8,7 +8,10 @@ import joblib
 import sqlite3
 import time
 import random
+import os
 from tensorflow.keras.models import load_model
+from gtts import gTTS         # Text-to-Speech
+import speech_recognition as sr # Speech-to-Text
 
 # ------------------------------------------------------
 # 1. 🧱 PAGE CONFIG & CSS
@@ -29,7 +32,6 @@ st.markdown("""
         padding: 15px;
         border-radius: 10px;
     }
-    /* Force Text to Black */
     div[data-testid="stMetricLabel"] p { color: #31333F !important; font-weight: bold; }
     div[data-testid="stMetricValue"] div { color: #000000 !important; }
 
@@ -41,7 +43,38 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ------------------------------------------------------
-# 2. 💾 DATABASE & NOTIFICATION SYSTEM
+# 2. 🔊 VOICE FUNCTIONS (NEW)
+# ------------------------------------------------------
+def text_to_speech(text, lang='en'):
+    """Converts text to audio and plays it."""
+    try:
+        tts = gTTS(text=text, lang=lang, slow=False)
+        filename = "advisory.mp3"
+        tts.save(filename)
+        st.audio(filename, format="audio/mp3")
+        os.remove(filename) # Clean up
+    except Exception as e:
+        st.error(f"Audio Error: {e}")
+
+def recognize_speech():
+    """Listens to the microphone and returns text."""
+    r = sr.Recognizer()
+    try:
+        with sr.Microphone() as source:
+            st.toast("🎤 Listening... Speak now!", icon="👂")
+            audio = r.listen(source, timeout=5)
+            text = r.recognize_google(audio)
+            return text
+    except sr.RequestError:
+        st.error("Internet required for voice recognition.")
+    except sr.UnknownValueError:
+        st.warning("Could not understand audio. Try again.")
+    except Exception as e:
+        st.error(f"Microphone Error: {e} (Ensure PyAudio is installed)")
+    return None
+
+# ------------------------------------------------------
+# 3. 💾 DATABASE & CONFIG
 # ------------------------------------------------------
 conn = sqlite3.connect('farm_data.db', check_same_thread=False)
 c = conn.cursor()
@@ -55,18 +88,6 @@ def save_feedback(city, pred, actual):
               (dt.datetime.now(), city, pred, actual, err))
     conn.commit()
 
-def send_alert(phone, msg, channel="SMS"):
-    """
-    Simulates sending a real SMS/WhatsApp.
-    In production, replace print() with Twilio/Gupshup API calls.
-    """
-    time.sleep(1) # Simulate network delay
-    # st.toast shows a popup notification in the app
-    st.toast(f"🔔 {channel} sent to {phone}: {msg}", icon="📲")
-
-# ------------------------------------------------------
-# 3. ⚙️ CONFIGURATION
-# ------------------------------------------------------
 CROP_INFO = {
     "Wheat": {"duration": 140, "stages": [(0,20,"Germination"), (21,60,"Tillering"), (61,90,"Flowering"), (91,140,"Ripening")]},
     "Rice": {"duration": 120, "stages": [(0,15,"Seedling"), (16,45,"Tillering"), (46,75,"Flowering"), (76,120,"Harvesting")]},
@@ -93,10 +114,8 @@ def load_resources():
 model, feature_scaler, target_scaler = load_resources()
 
 # ------------------------------------------------------
-# 4. 🧠 INTELLIGENCE LAYER
+# 4. 🧠 CORE FUNCTIONS
 # ------------------------------------------------------
-
-# A. LSTM WEATHER
 def fetch_weather_and_predict(city):
     if not model: return None, 0.0
     lat, lon = CITY_COORDS.get(city, (30.7046, 76.7179))
@@ -136,11 +155,9 @@ def fetch_weather_and_predict(city):
         y = model.predict(X_scaled)
         pred_val = max(0.0, float(target_scaler.inverse_transform(y)[0][0]))
         return current_weather, pred_val
-
     except:
         return None, 0.0
 
-# B. SIMULATIONS
 def diagnose_plant(img):
     time.sleep(1.5)
     diseases = ["Yellow Rust", "Leaf Blight", "Healthy Crop", "Nitrogen Deficiency"]
@@ -156,92 +173,73 @@ def get_market_prices(crop):
 
 def get_bot_response(msg, rain, crop):
     msg = msg.lower()
-    if "price" in msg: return f"The current trend for {crop} is stable around ₹2200/Q."
+    if "price" in msg: return f"The current price for {crop} is ₹2200 per quintal."
     if "spray" in msg: return "Do not spray if rain is predicted > 1mm." if rain > 1 else "Yes, weather looks clear for spraying."
     if "irrigate" in msg: return "Hold irrigation." if rain > 5 else "Soil moisture is low. You can irrigate."
     return f"I am managing your {crop}. Ask me about prices, weather, or health."
 
 # ------------------------------------------------------
-# 5. 🖥️ USER INTERFACE
+# 5. 🖥️ UI LAYOUT
 # ------------------------------------------------------
-
 if "page" not in st.session_state: st.session_state.page = "landing"
 if "data" not in st.session_state: st.session_state.data = {}
-if "alerts" not in st.session_state: st.session_state.alerts = {"phone": "", "active": False}
 
-# --- PAGE 1: LANDING ---
 if st.session_state.page == "landing":
     st.markdown("<h1 style='text-align: center;'>🚜 Kisan Farm OS</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center;'>Smart Farming: Weather • Health • Markets • Alerts</p>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center;'>Voice-Enabled Smart Farming</p>", unsafe_allow_html=True)
     
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         with st.form("onboard"):
             st.subheader("Create Farm Profile")
-            name = st.text_input("Farmer Name", "Ram Singh")
-            crop = st.selectbox("Select Crop", list(CROP_INFO.keys()))
-            city = st.selectbox("Nearest City", list(CITY_COORDS.keys()))
+            name = st.text_input("Name", "Ram Singh")
+            crop = st.selectbox("Crop", list(CROP_INFO.keys()))
+            city = st.selectbox("Region", list(CITY_COORDS.keys()))
             sowing = st.date_input("Sowing Date", dt.date.today() - dt.timedelta(days=45))
-            
-            st.markdown("---")
-            st.write("🔔 **Get Alerts**")
-            phone = st.text_input("Phone Number (Optional)", placeholder="+91 98765 43210")
-            enable_alerts = st.checkbox("Send me SMS alerts for heavy rain")
-            
-            if st.form_submit_button("🚀 Launch Dashboard"):
+            if st.form_submit_button("🚀 Start"):
                 st.session_state.data = {"name": name, "crop": crop, "city": city, "sowing": sowing}
-                st.session_state.alerts = {"phone": phone, "active": enable_alerts}
                 st.session_state.page = "dashboard"
                 st.rerun()
 
-# --- PAGE 2: DASHBOARD ---
 else:
     data = st.session_state.data
-    alerts = st.session_state.alerts
     crop_conf = CROP_INFO[data["crop"]]
     
-    # SIDEBAR
     st.sidebar.title("🚜 Farm OS")
-    st.sidebar.info(f"👤 **{data['name']}**\n\n📍 {data['city']}\n\n🌾 {data['crop']}")
-    
-    # Alert Status in Sidebar
-    if alerts["active"]:
-        st.sidebar.success(f"🔔 Alerts Active\n\n{alerts['phone']}")
-    else:
-        st.sidebar.warning("🔕 Alerts Off")
-
+    st.sidebar.info(f"👤 {data['name']}\n\n📍 {data['city']}")
     if st.sidebar.button("Log Out"): 
         st.session_state.page = "landing"
         st.rerun()
 
-    # DATA FETCH
     weather, pred_rain = fetch_weather_and_predict(data["city"])
     days_age = (dt.date.today() - data["sowing"]).days
 
-    # TABS
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
-        "🌦️ Weather & Alerts", 
-        "🌾 Crop Health", 
-        "🏥 Plant Doctor", 
-        "💰 Mandi Prices", 
-        "💬 Assistant"
+        "🌦️ Weather & Voice", "🌾 Crop Health", "🏥 Plant Doctor", "💰 Prices", "💬 Assistant"
     ])
 
-    # --- TAB 1: WEATHER & ALERTS ---
+    # --- TAB 1: WEATHER + VOICE OUTPUT ---
     with tab1:
-        st.subheader("Live Forecast & Advisory")
+        st.subheader("Live Forecast")
         
-        # Traffic Light Logic + ALERT TRIGGER
+        # Prepare Advisory Text
         if pred_rain > 5.0:
-            st.markdown(f"<div class='traffic-red'><h2>🚫 STOP WORK</h2><p>Heavy Rain ({pred_rain:.1f}mm) Predicted.</p></div>", unsafe_allow_html=True)
-            # 🚨 TRIGGER ALERT
-            if alerts["active"]:
-                send_alert(alerts["phone"], f"⚠️ ALERT: Heavy rain ({pred_rain:.1f}mm) expected in {data['city']}. Stop irrigation.", "SMS")
-        
+            status = "Heavy Rain"
+            adv_text = f"Alert! Heavy rain of {pred_rain:.1f} millimeters predicted. Stop all irrigation and spraying immediately."
+            st.markdown(f"<div class='traffic-red'><h2>🚫 STOP WORK</h2><p>{status} ({pred_rain:.1f}mm)</p></div>", unsafe_allow_html=True)
         elif pred_rain > 1.0:
-            st.markdown(f"<div class='traffic-yellow'><h2>⚠️ CAUTION</h2><p>Light Rain ({pred_rain:.1f}mm). Delay Spraying.</p></div>", unsafe_allow_html=True)
+            status = "Light Rain"
+            adv_text = f"Caution. Light rain of {pred_rain:.1f} millimeters expected. Delay pesticide spraying."
+            st.markdown(f"<div class='traffic-yellow'><h2>⚠️ CAUTION</h2><p>{status} ({pred_rain:.1f}mm)</p></div>", unsafe_allow_html=True)
         else:
-            st.markdown(f"<div class='traffic-green'><h2>🟢 GO AHEAD</h2><p>Clear Weather. Safe for Irrigation/Spray.</p></div>", unsafe_allow_html=True)
+            status = "Clear"
+            adv_text = f"Weather is clear. You can proceed with irrigation and farm operations."
+            st.markdown(f"<div class='traffic-green'><h2>🟢 GO AHEAD</h2><p>{status} Weather</p></div>", unsafe_allow_html=True)
+
+        # 🔊 VOICE ADVISORY BUTTON
+        st.write("")
+        if st.button("🔊 Listen to Advisory"):
+            text_to_speech(adv_text)
 
         st.write("")
         m1, m2, m3, m4 = st.columns(4)
@@ -250,18 +248,10 @@ else:
             m2.metric("Temp", f"{weather['temp']} °C")
             m3.metric("Humidity", f"{weather['hum']}%")
             m4.metric("Wind", f"{weather['wind']} km/h")
-        
-        st.markdown("---")
-        with st.expander("🧠 Teach the Model (Self-Learning)"):
-            st.write("Help us improve. What is the ACTUAL rain today?")
-            actual_rain = st.number_input("Observed Rain (mm):", 0.0, 100.0)
-            if st.button("Submit Feedback"):
-                save_feedback(data["city"], pred_rain, actual_rain)
-                st.success("✅ Feedback Saved! Model will learn from this.")
 
     # --- TAB 2: CROP HEALTH ---
     with tab2:
-        st.subheader(f"{data['crop']} Growth Trajectory")
+        st.subheader("Crop Growth")
         c1, c2 = st.columns([2, 1])
         with c1:
             x = list(range(0, crop_conf["duration"] + 1, 5))
@@ -270,50 +260,56 @@ else:
             
             fig = go.Figure()
             fig.add_trace(go.Scatter(x=x, y=y, name="Ideal Path", line=dict(color='green', dash='dot')))
-            fig.add_trace(go.Scatter(x=[days_age], y=[curr_y], mode='markers', marker=dict(color='red', size=15), name="You are here"))
-            fig.update_layout(height=300, xaxis_title="Days", yaxis_title="% Growth", margin=dict(l=20,r=20,t=20,b=20))
+            fig.add_trace(go.Scatter(x=[days_age], y=[curr_y], mode='markers', marker=dict(color='red', size=15), name="You"))
             st.plotly_chart(fig, use_container_width=True)
-            
-            # Using real image URL for visual reference
-            st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/3/3d/Wheat_growth_stages.png/320px-Wheat_growth_stages.png", caption="Crop Stages Reference")
+            st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/3/3d/Wheat_growth_stages.png/320px-Wheat_growth_stages.png", caption="Stages")
 
         with c2:
-            st.info(f"📅 **Day {days_age}** of {crop_conf['duration']}")
+            st.metric("Age", f"{days_age} Days")
             curr_stage = "Harvested"
             for s, e, n in crop_conf["stages"]:
                 if s <= days_age <= e: curr_stage = n
-            st.metric("Current Stage", curr_stage)
+            st.metric("Stage", curr_stage)
             st.progress(min(100, int(days_age/crop_conf["duration"]*100)))
 
     # --- TAB 3: PLANT DOCTOR ---
     with tab3:
         st.subheader("📸 AI Plant Doctor")
-        img = st.file_uploader("Upload Image", type=['jpg', 'png'])
+        img = st.file_uploader("Upload Leaf Photo", type=['jpg', 'png'])
         if img:
-            st.image(img, width=250, caption="Uploaded Leaf")
-            if st.button("Diagnose Disease"):
-                with st.spinner("Analyzing..."):
-                    disease, conf = diagnose_plant(img)
-                st.success(f"**Diagnosis:** {disease}")
-                if "Healthy" not in disease:
-                    st.warning("💊 **Recommendation:** Apply Propiconazole 25% EC.")
+            st.image(img, width=200)
+            if st.button("Diagnose"):
+                with st.spinner("Scanning..."):
+                    d, c = diagnose_plant(img)
+                st.success(f"Result: {d}")
 
-    # --- TAB 4: MARKET PRICES ---
+    # --- TAB 4: PRICES ---
     with tab4:
-        st.subheader("💰 Live Mandi Prices")
-        df_prices = get_market_prices(data["crop"])
-        st.dataframe(df_prices, use_container_width=True)
-        st.line_chart([2200, 2250, 2220, 2280, 2300])
+        st.subheader("💰 Market Prices")
+        st.dataframe(get_market_prices(data["crop"]), use_container_width=True)
 
-    # --- TAB 5: CHATBOT ---
+    # --- TAB 5: VOICE ASSISTANT (INPUT) ---
     with tab5:
-        st.subheader("🤖 Kisan Assistant")
+        st.subheader("🤖 Voice Assistant")
         if "messages" not in st.session_state: st.session_state.messages = []
+        
         for msg in st.session_state.messages:
             st.chat_message(msg["role"]).write(msg["content"])
-        if prompt := st.chat_input("Ask question..."):
-            st.chat_message("user").write(prompt)
-            st.session_state.messages.append({"role": "user", "content": prompt})
-            resp = get_bot_response(prompt, pred_rain, data["crop"])
-            st.chat_message("assistant").write(resp)
-            st.session_state.messages.append({"role": "assistant", "content": resp})
+
+        # 🎤 VOICE INPUT BUTTON
+        col1, col2 = st.columns([1, 4])
+        with col1:
+            if st.button("🎤 Speak"):
+                voice_text = recognize_speech()
+                if voice_text:
+                    st.session_state.messages.append({"role": "user", "content": voice_text})
+                    resp = get_bot_response(voice_text, pred_rain, data["crop"])
+                    st.session_state.messages.append({"role": "assistant", "content": resp})
+                    st.rerun()
+
+        with col2:
+            if prompt := st.chat_input("Or type here..."):
+                st.session_state.messages.append({"role": "user", "content": prompt})
+                resp = get_bot_response(prompt, pred_rain, data["crop"])
+                st.session_state.messages.append({"role": "assistant", "content": resp})
+                st.rerun()
