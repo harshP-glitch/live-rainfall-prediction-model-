@@ -11,7 +11,7 @@ import random
 import os
 from tensorflow.keras.models import load_model
 
-# Try importing Voice Libraries (Graceful fallback if not installed)
+# Try importing Voice Libraries
 try:
     from gtts import gTTS
     import speech_recognition as sr
@@ -29,15 +29,21 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
+# 🛑 CSS FIX: FORCE BLACK TEXT EVERYWHERE
 st.markdown("""
     <style>
-    /* GLOBAL STYLES */
-    .stApp { background-color: #f8f9fa; }
-    #MainMenu, footer, header {visibility: hidden;}
+    /* GLOBAL RESET */
+    .stApp { background-color: #f8f9fa; color: black !important; }
+    
+    /* INPUT LABELS */
+    label, .stTextInput label, .stSelectbox label, .stDateInput label {
+        color: #31333F !important;
+        font-weight: 600 !important;
+    }
     
     /* CARD STYLING */
     .pro-card {
-        background-color: black !important;
+        background-color: white !important;
         padding: 20px;
         border-radius: 15px;
         box-shadow: 0 4px 6px rgba(0,0,0,0.1);
@@ -47,7 +53,7 @@ st.markdown("""
     }
     .pro-card h3, .pro-card p, .pro-card b, .pro-card div { color: black !important; }
     
-    /* HERO WEATHER CARD */
+    /* HERO WEATHER CARD (Keep White Text) */
     .weather-hero {
         background: linear-gradient(135deg, #2E7D32 0%, #4CAF50 100%);
         color: white !important;
@@ -58,52 +64,36 @@ st.markdown("""
     }
     .weather-hero h1, .weather-hero h2, .weather-hero p { color: white !important; }
 
-    /* ACTION BUTTONS */
+    /* BUTTONS */
     .stButton button {
         background-color: white !important;
         color: black !important;
         border: 1px solid #ddd !important;
         border-radius: 12px !important;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.05) !important;
-        font-weight: 600 !important;
-        height: 80px !important;
-    }
-    .stButton button:hover {
-        border-color: #2E7D32 !important;
-        color: #2E7D32 !important;
-        background-color: #f9f9f9 !important;
+        height: 60px !important;
     }
     
-    /* SEARCH CONTAINER */
+    /* SEARCH & ALERTS */
     .search-header {
-        background: #2E7D32;
-        padding: 20px;
-        border-radius: 0 0 20px 20px;
-        color: white;
-        text-align: center;
-        margin-bottom: 20px;
+        background: #2E7D32; padding: 20px; border-radius: 0 0 20px 20px;
+        color: white !important; text-align: center; margin-bottom: 20px;
     }
-    .search-result { border-left: 5px solid #4CAF50; padding-left: 15px; }
-
-    /* TRAFFIC LIGHT PILLS */
-    .pill-red { background-color: #FF5252; padding: 5px 10px; border-radius: 10px; color: white; font-weight: bold; }
-    .pill-green { background-color: #4CAF50; padding: 5px 10px; border-radius: 10px; color: white; font-weight: bold; }
+    .pill-red { background-color: #FF5252; padding: 5px 10px; border-radius: 10px; color: white !important; font-weight: bold; }
+    .pill-green { background-color: #4CAF50; padding: 5px 10px; border-radius: 10px; color: white !important; font-weight: bold; }
+    
+    /* HIDE DEFAULTS */
+    #MainMenu, footer, header {visibility: hidden;}
     </style>
 """, unsafe_allow_html=True)
 
 # ------------------------------------------------------
-# 2. 🧠 DATA & BACKEND LOGIC
+# 2. 🧠 BACKEND LOGIC
 # ------------------------------------------------------
-
-# --- KNOWLEDGE BASE (For Search) ---
 CROP_DATABASE = [
     {"name": "Wheat (Rabi)", "hindi": "गेहूं", "soil": "Loamy", "sowing": "Nov-Dec", "harvest": "Apr-May", "water": "Moderate", "diseases": ["Yellow Rust", "Loose Smut"], "varieties": ["PBW 343", "HD 2967"], "states": ["Punjab", "Haryana", "UP"]},
     {"name": "Rice (Kharif)", "hindi": "धान", "soil": "Clayey", "sowing": "Jun-Jul", "harvest": "Oct-Nov", "water": "High", "diseases": ["Blast", "Blight"], "varieties": ["Basmati 1121", "PR 126"], "states": ["Punjab", "WB", "UP"]},
     {"name": "Cotton", "hindi": "कपास", "soil": "Black Soil", "sowing": "Apr-May", "harvest": "Oct-Jan", "water": "Low", "diseases": ["Pink Bollworm"], "varieties": ["Bt Cotton"], "states": ["Gujarat", "Maharashtra"]},
-    {"name": "Sugarcane", "hindi": "गन्ना", "soil": "Rich Loam", "sowing": "Feb-Mar", "harvest": "Dec-Mar", "water": "Very High", "diseases": ["Red Rot"], "varieties": ["Co 0238"], "states": ["UP", "Maharashtra"]},
 ]
-
-# --- APP CONFIG DATA ---
 CROP_INFO = {
     "Wheat": {"duration": 140, "stages": [(0,20,"Germination"), (21,60,"Tillering"), (61,90,"Flowering"), (91,140,"Ripening")]},
     "Rice": {"duration": 120, "stages": [(0,15,"Seedling"), (16,45,"Tillering"), (46,75,"Flowering"), (76,120,"Harvesting")]},
@@ -111,7 +101,6 @@ CROP_INFO = {
 }
 CITY_COORDS = {"Mohali": (30.7, 76.7), "Ludhiana": (30.9, 75.8), "Delhi": (28.6, 77.2), "Bathinda": (30.2, 74.9)}
 
-# --- RESOURCES ---
 conn = sqlite3.connect('farm_data.db', check_same_thread=False)
 c = conn.cursor()
 c.execute('''CREATE TABLE IF NOT EXISTS feedback (date TEXT, city TEXT, pred_rain REAL, actual_rain REAL, error REAL)''')
@@ -128,7 +117,6 @@ def load_resources():
 
 model, feature_scaler, target_scaler = load_resources()
 
-# --- WEATHER API ---
 def fetch_weather_and_predict(city):
     if not model: return {"temp": 28, "rain": 0, "hum": 60, "wind": 10}, 0.0
     lat, lon = CITY_COORDS.get(city, (30.7, 76.7))
@@ -143,8 +131,6 @@ def fetch_weather_and_predict(city):
         })
         now = pd.Timestamp.now().floor('h')
         idx = abs(df['time'] - now).idxmin()
-        
-        # Prepare Features
         def val(i, c): return df.loc[i, c] if i >= 0 else 0.0
         features = [
             val(idx-1, "rain"), val(idx-3, "rain"), val(idx-7, "rain"),
@@ -156,19 +142,16 @@ def fetch_weather_and_predict(city):
         ]
         X = feature_scaler.transform(np.array(features).reshape(1, -1)).reshape(1, 1, 11)
         if model.input_shape[-1] == 1: X = X[:, :, 0:1]
-        
         pred = max(0.0, float(target_scaler.inverse_transform(model.predict(X))[0][0]))
         return {"temp": df.loc[idx, "temp"], "hum": df.loc[idx, "hum"], "wind": df.loc[idx, "wind"], "rain": float(f"{pred:.1f}")}, pred
     except: return {"temp": 25, "rain": 0, "hum": 50, "wind": 5}, 0.0
 
-# --- HELPER FUNCTIONS ---
 def text_to_speech(text):
     if not VOICE_ENABLED: return
     try:
         tts = gTTS(text=text, lang='en')
         tts.save("audio.mp3")
         st.audio("audio.mp3", format="audio/mp3", start_time=0)
-        os.remove("audio.mp3")
     except: pass
 
 def get_bot_response(msg, rain, crop):
@@ -178,13 +161,13 @@ def get_bot_response(msg, rain, crop):
     return f"I can help with {crop} weather and prices."
 
 # ------------------------------------------------------
-# 3. 📱 APP NAVIGATION & PAGES
+# 3. 📱 APP NAVIGATION & LOGIN
 # ------------------------------------------------------
 if "authenticated" not in st.session_state: st.session_state.authenticated = False
 if "page" not in st.session_state: st.session_state.page = "home"
 if "user_data" not in st.session_state: st.session_state.user_data = {}
 
-# ================= LOGIN (OTP) =================
+# === LOGIN SCREEN ===
 if not st.session_state.authenticated:
     st.markdown("<br><br>", unsafe_allow_html=True)
     st.image("https://cdn-icons-png.flaticon.com/512/3025/3025528.png", width=100)
@@ -200,14 +183,17 @@ if not st.session_state.authenticated:
             city = st.selectbox("City", list(CITY_COORDS.keys()))
             sowing = st.date_input("Sowing Date", dt.date.today()-dt.timedelta(days=40))
             phone = st.text_input("Mobile", "9876543210")
+            
             if st.button("Get OTP", type="primary", use_container_width=True):
                 st.session_state.otp = random.randint(1000,9999)
                 st.session_state.temp = {"name":name, "crop":crop, "city":city, "sowing":sowing}
                 st.session_state.otp_sent = True
-                st.toast(f"🔔 OTP: {st.session_state.otp}", icon="📩")
                 st.rerun()
         else:
-            st.info("OTP Sent! Check notification.")
+            # 🔔 VISIBLE SIMULATED OTP 🔔
+            st.success(f"✅ SMS Sent to {phone}: **{st.session_state.otp}**")
+            st.info("Use the code above to login.")
+            
             u_otp = st.text_input("Enter OTP", max_chars=4)
             if st.button("Verify Login", type="primary", use_container_width=True):
                 if str(u_otp) == str(st.session_state.otp):
@@ -215,22 +201,24 @@ if not st.session_state.authenticated:
                     st.session_state.authenticated = True
                     st.rerun()
                 else: st.error("Wrong OTP")
+            
+            if st.button("Resend"):
+                st.session_state.otp_sent = False
+                st.rerun()
+                
         st.markdown("</div>", unsafe_allow_html=True)
 
-# ================= MAIN APP =================
+# === MAIN DASHBOARD ===
 else:
     data = st.session_state.user_data
     w, pred_rain = fetch_weather_and_predict(data['city'])
 
-    # --- HOME DASHBOARD ---
     if st.session_state.page == "home":
-        # Header
         c1, c2 = st.columns([4, 1])
         with c1: st.markdown(f"### 👋 Namaste, {data['name']}")
         with c2: 
             if st.button("🚪"): st.session_state.authenticated = False; st.rerun()
 
-        # Hero Card
         status = "STOP WORK" if w['rain'] > 5 else "SAFE TO WORK"
         color = "pill-red" if w['rain'] > 5 else "pill-green"
         st.markdown(f"""
@@ -245,7 +233,6 @@ else:
         """, unsafe_allow_html=True)
         if st.button("🔊 Listen"): text_to_speech(f"Temperature is {w['temp']} degrees. {status}")
 
-        # Grid
         st.markdown("### 🚜 Actions")
         c1, c2, c3, c4 = st.columns(4)
         with c1: 
@@ -257,11 +244,9 @@ else:
         with c4: 
             if st.button("🤖\nChat"): st.session_state.page = "chat"; st.rerun()
 
-        # Feed
         st.markdown("### 📢 Alerts")
         st.markdown(f"""<div class='pro-card'>📢 <b>Mandi Update:</b> {data['crop']} prices are up by ₹40 today.</div>""", unsafe_allow_html=True)
 
-    # --- SEARCH PAGE ---
     elif st.session_state.page == "search":
         if st.button("← Back"): st.session_state.page = "home"; st.rerun()
         st.markdown("<div class='search-header'><h1>🔍 Kisan Gyan</h1><p>Search Crops & Diseases</p></div>", unsafe_allow_html=True)
@@ -275,21 +260,18 @@ else:
                         st.write(f"**Diseases:** {', '.join(f['diseases'])}")
             else: st.info("No results found.")
 
-    # --- PLANT DOCTOR ---
     elif st.session_state.page == "doctor":
         if st.button("← Back"): st.session_state.page = "home"; st.rerun()
         st.title("🏥 Plant Doctor")
-        with st.container():
-            st.markdown("<div class='pro-card'>", unsafe_allow_html=True)
-            st.write("Upload Leaf Photo")
-            img = st.file_uploader(" ", label_visibility="collapsed")
-            if img:
-                st.image(img, width=200)
-                st.success("Detected: Yellow Rust")
-                st.info("Spray Propiconazole")
-            st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown("<div class='pro-card'>", unsafe_allow_html=True)
+        st.write("Upload Leaf Photo")
+        img = st.file_uploader(" ", label_visibility="collapsed")
+        if img:
+            st.image(img, width=200)
+            st.success("Detected: Yellow Rust")
+            st.info("Spray Propiconazole")
+        st.markdown("</div>", unsafe_allow_html=True)
 
-    # --- MANDI PRICES ---
     elif st.session_state.page == "mandi":
         if st.button("← Back"): st.session_state.page = "home"; st.rerun()
         st.title("💰 Market Rates")
@@ -305,13 +287,11 @@ else:
         </div>
         """, unsafe_allow_html=True)
 
-    # --- CHATBOT ---
     elif st.session_state.page == "chat":
         if st.button("← Back"): st.session_state.page = "home"; st.rerun()
         st.title("🤖 Assistant")
         if "messages" not in st.session_state: st.session_state.messages = []
         for msg in st.session_state.messages: st.chat_message(msg["role"]).write(msg["content"])
-        
         if prompt := st.chat_input("Ask..."):
             st.chat_message("user").write(prompt)
             st.session_state.messages.append({"role": "user", "content": prompt})
