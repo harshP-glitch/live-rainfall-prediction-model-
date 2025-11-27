@@ -37,7 +37,7 @@ st.markdown("""
     
     /* CARD STYLING */
     .pro-card {
-        background-color: white !important;
+        background-color: black !important;
         padding: 20px;
         border-radius: 15px;
         box-shadow: 0 4px 6px rgba(0,0,0,0.1);
