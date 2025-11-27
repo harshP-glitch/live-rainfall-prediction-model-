@@ -168,6 +168,7 @@ if "page" not in st.session_state: st.session_state.page = "home"
 if "user_data" not in st.session_state: st.session_state.user_data = {}
 
 # === LOGIN SCREEN ===
+# ================= LOGIN SCREEN (Fixed) =================
 if not st.session_state.authenticated:
     st.markdown("<br><br>", unsafe_allow_html=True)
     st.image("https://cdn-icons-png.flaticon.com/512/3025/3025528.png", width=100)
@@ -177,21 +178,31 @@ if not st.session_state.authenticated:
     
     with st.container():
         st.markdown("<div class='pro-card'>", unsafe_allow_html=True)
+        
+        # BLOCK 1: INPUT DETAILS
         if not st.session_state.otp_sent:
             name = st.text_input("Full Name", "Ram Singh")
             crop = st.selectbox("Crop", list(CROP_INFO.keys()))
             city = st.selectbox("City", list(CITY_COORDS.keys()))
             sowing = st.date_input("Sowing Date", dt.date.today()-dt.timedelta(days=40))
-            phone = st.text_input("Mobile", "9876543210")
+            
+            # Save phone input to a variable
+            input_phone = st.text_input("Mobile", "9876543210")
             
             if st.button("Get OTP", type="primary", use_container_width=True):
+                # 1. Save data to Session State so it persists after rerun
                 st.session_state.otp = random.randint(1000,9999)
                 st.session_state.temp = {"name":name, "crop":crop, "city":city, "sowing":sowing}
+                st.session_state.phone_number = input_phone  # <--- FIXED HERE
                 st.session_state.otp_sent = True
                 st.rerun()
+        
+        # BLOCK 2: VERIFY OTP
         else:
-            # 🔔 VISIBLE SIMULATED OTP 🔔
-            st.success(f"✅ SMS Sent to {phone}: **{st.session_state.otp}**")
+            # 2. Retrieve phone from Session State
+            saved_phone = st.session_state.get("phone_number", "your number")
+            
+            st.success(f"✅ SMS Sent to {saved_phone}: **{st.session_state.otp}**")
             st.info("Use the code above to login.")
             
             u_otp = st.text_input("Enter OTP", max_chars=4)
@@ -207,7 +218,6 @@ if not st.session_state.authenticated:
                 st.rerun()
                 
         st.markdown("</div>", unsafe_allow_html=True)
-
 # === MAIN DASHBOARD ===
 else:
     data = st.session_state.user_data
