@@ -10,3 +10,4 @@ Joblib
 plotly
 huggingface_hub
 requests
+gtts
