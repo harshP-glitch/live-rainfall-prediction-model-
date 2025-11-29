@@ -189,6 +189,21 @@ def render_login():
 
     st.markdown("</div>", unsafe_allow_html=True)
 
+def render_dashboard():
+    """Phase 2: Real-Time Weather Dashboard"""
+    user = st.session_state.user
+    
+    # 1. HEADER
+    c1, c2 = st.columns([3, 1])
+    with c1: 
+        st.markdown(f"### 👋 Namaste, {user['name'].split()[0]}")
+        st.caption(f"📍 {user['region']} • 🌾 {user['crop']}")
+    with c2:
+        if st.button("🚪"):
+            st.session_state.authenticated = False
+            st.session_state.otp_stage = False
+            st.rerun()
+    
 # 2. FETCH LIVE DATA (The Brain)
     with st.spinner("Connecting to Satellite..."):
         w = get_live_weather(user['region'])
