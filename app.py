@@ -3,6 +3,9 @@ import sqlite3
 import random
 import time
 import datetime as dt
+import requests # <--- NEW: For Live Weather API
+import pandas as pd # <--- NEW: For Data Processing
+
 
 # ------------------------------------------------------
 # 1. 🏗️ CORE CONFIGURATION & STYLING
