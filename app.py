@@ -189,33 +189,56 @@ def render_login():
 
     st.markdown("</div>", unsafe_allow_html=True)
 
-def render_home_placeholder():
-    """Placeholder for Phase 2"""
-    user = st.session_state.user
-    st.success(f"✅ Successfully Logged In as **{user['name']}**")
-    st.info("Phase 1 Complete. Ready for Weather & AI Integration.")
+# 2. FETCH LIVE DATA (The Brain)
+    with st.spinner("Connecting to Satellite..."):
+        w = get_live_weather(user['region'])
     
+    # 3. TRAFFIC LIGHT LOGIC (The Problem Solver)
+    # If rain > 5mm in next 24h -> RED ALERT
+    if isinstance(w['rain_forecast'], (int, float)) and w['rain_forecast'] > 5.0:
+        theme_color = "linear-gradient(135deg, #DC2626 0%, #991B1B 100%)" # Red
+        status_text = "🚫 STOP WORK"
+        advisory = f"Heavy rain ({w['rain_forecast']:.1f}mm) expected. Do not spray pesticides."
+    elif isinstance(w['rain_forecast'], (int, float)) and w['rain_forecast'] > 1.0:
+        theme_color = "linear-gradient(135deg, #F59E0B 0%, #D97706 100%)" # Yellow
+        status_text = "⚠️ CAUTION"
+        advisory = f"Light drizzle ({w['rain_forecast']:.1f}mm) likely. Hold irrigation."
+    else:
+        theme_color = "linear-gradient(135deg, #2E7D32 0%, #4CAF50 100%)" # Green
+        status_text = "🟢 GO AHEAD"
+        advisory = "Weather is clear. Safe for irrigation & spraying."
+
+    # 4. RENDER HERO CARD
     st.markdown(f"""
-    <div class='pro-card'>
-        <h3>👤 Profile Active</h3>
-        <p><b>Crop:</b> {user['crop']}</p>
-        <p><b>Region:</b> {user['region']}</p>
-        <p><b>Mobile:</b> {user['phone']}</p>
+    <div class="hero-card" style="background: {theme_color};">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 10px;">
+            <span class="status-pill">{status_text}</span>
+            <span>{dt.datetime.now().strftime('%d %b, %I:%M %p')}</span>
+        </div>
+        <div style="display:flex; align-items:flex-end; gap:15px;">
+            <h1 style="margin:0; font-size:3.5rem;">{w['temp']}°C</h1>
+            <div style="margin-bottom:10px;">
+                <p style="margin:0;">🌧️ {w['rain_forecast']}mm Rain</p>
+                <p style="margin:0;">💧 {w['humidity']}% Hum</p>
+            </div>
+        </div>
+        <hr style="border-color: rgba(255,255,255,0.3);">
+        <p style="font-weight: 500; font-size: 1.1rem;">📢 {advisory}</p>
     </div>
     """, unsafe_allow_html=True)
-    
-    if st.button("Logout"):
-        st.session_state.authenticated = False
-        st.session_state.otp_stage = False
-        st.rerun()
+
+    # 5. PHASE 3 & 4 PLACEHOLDERS
+    st.markdown("### 🚜 Coming Next")
+    c1, c2 = st.columns(2)
+    with c1: st.info("🏥 Plant Doctor\n\n(Phase 3)")
+    with c2: st.success("💰 Mandi Prices\n\n(Phase 4)")
 
 # ------------------------------------------------------
-# 4. 🚀 MAIN EXECUTION
+# 5. 🚀 EXECUTION
 # ------------------------------------------------------
 if __name__ == "__main__":
     init_session()
-    
     if not st.session_state.authenticated:
         render_login()
     else:
-        render_home_placeholder()
+        render_dashboard()
