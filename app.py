@@ -422,12 +422,110 @@ def render_dashboard():
     with c2:
         st.success("💰 Mandi Prices\n\n(Coming Phase 4)")
 
+ ------------------------------------------------------
+# PHASE 4: MONEY MODULE (Mandi Prices)
+# ------------------------------------------------------
+def render_mandi():
+    """Displays Real-Time Market Prices & Comparisons"""
+    if "user" not in st.session_state or not st.session_state.user:
+        st.session_state.page = "login"
+        st.rerun()
+        
+    user_crop = st.session_state.user.get('crop', 'Wheat')
+    user_city = st.session_state.user.get('region', 'Local')
+    
+    st.markdown(f"### 💰 Market Rates: {user_crop}")
+    
+    # 1. Base Price Logic (Simulated Real-Time)
+    price_map = {
+        "Wheat (Rabi)": 2275,
+        "Rice (Kharif)": 3100,
+        "Cotton": 6600,
+        "Sugarcane": 340,
+        "Maize": 2090,
+        "Mustard": 5650
+    }
+    base_price = price_map.get(user_crop, 2000)
+    
+    # Add daily fluctuation
+    fluctuation = random.randint(-50, 100)
+    current_price = base_price + fluctuation
+    
+    # Visual Logic
+    trend_symbol = "📈 UP" if fluctuation > 0 else "📉 DOWN"
+    trend_color = "#166534" if fluctuation > 0 else "#991b1b" # Green or Red
+    
+    # 2. Local Market Card
+    st.markdown(f"""
+    <div class='pro-card' style='border-left: 5px solid {trend_color};'>
+        <p style='margin:0; color:gray;'>📍 {user_city} APMC (Local)</p>
+        <h1 style='color: {trend_color}; margin: 5px 0;'>₹{current_price} / Q</h1>
+        <p style='color: #333; margin: 0; font-weight:500;'><b>Trend:</b> {trend_symbol} by ₹{abs(fluctuation)} today</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # 3. Comparison Table (Arbitrage Opportunity)
+    st.markdown("### 🚛 Nearby Markets")
+    st.write("Compare rates to sell profitably:")
+    
+    nearby_mandis = [
+        ("District Main", current_price + random.randint(20, 60), "25km"),
+        ("Private Trader", current_price - random.randint(10, 30), "Doorstep"),
+        ("Neighbor District", current_price + random.randint(10, 40), "45km")
+    ]
+    
+    st.markdown("<div class='pro-card'>", unsafe_allow_html=True)
+    
+    # Header Row
+    c1, c2, c3 = st.columns([2, 1, 1])
+    c1.markdown("**Mandi**")
+    c2.markdown("**Price**")
+    c3.markdown("**Dist**")
+    st.markdown("<hr style='margin: 5px 0;'>", unsafe_allow_html=True)
+    
+    # Data Rows
+    for name, price, dist in nearby_mandis:
+        c1, c2, c3 = st.columns([2, 1, 1])
+        c1.write(name)
+        
+        # Color code price difference
+        diff = price - current_price
+        diff_color = "green" if diff > 0 else "red"
+        diff_text = f"+₹{diff}" if diff > 0 else f"-₹{abs(diff)}"
+        
+        c2.markdown(f"**₹{price}** <span style='color:{diff_color}; font-size:0.8rem;'>{diff_text}</span>", unsafe_allow_html=True)
+        c3.caption(dist)
+        st.markdown("<hr style='margin: 5px 0; border-top: 1px dashed #eee;'>", unsafe_allow_html=True)
+        
+    st.success("💡 **Tip:** Selling at 'District Main' covers transport cost and gives ₹200 extra profit per trolley.")
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    if st.button("⬅️ Back to Home"):
+        st.session_state.page = "dashboard"
+        st.rerun()
+```
+
+#### **Part 2: Update the Dashboard Button**
+Go to your `render_dashboard` function. Find the `c2` column (bottom right) and update it to enable the button.
+
+```python
+    # Inside render_dashboard...
+    with c2:
+        if st.button("💰 Mandi Prices"):
+            st.session_state.page = "mandi"
+            st.rerun()
+
 # ------------------------------------------------------
 # 5. 🚀 EXECUTION
 # ------------------------------------------------------
 if __name__ == "__main__":
     init_session()
+    
     if not st.session_state.authenticated:
         render_login()
-    else:
+    elif st.session_state.page == "dashboard":
         render_dashboard()
+    elif st.session_state.page == "plant_doctor":
+        render_plant_doctor()
+    elif st.session_state.page == "mandi":   # <--- ADD THIS
+        render_mandi()                       # <--- ADD THIS
