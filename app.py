@@ -1,531 +1,310 @@
 import streamlit as st
-import sqlite3
-import random
-import time
+import pandas as pd
+import numpy as np
+import plotly.graph_objects as go
+import requests
 import datetime as dt
-import requests # <--- NEW: For Live Weather API
-import pandas as pd # <--- NEW: For Data Processing
+import joblib
+import sqlite3
+import time
+import random
+import os
+from tensorflow.keras.models import load_model
 
+# Try importing Voice Libraries
+try:
+    from gtts import gTTS
+    import speech_recognition as sr
+    VOICE_ENABLED = True
+except ImportError:
+    VOICE_ENABLED = False
 
 # ------------------------------------------------------
-# 1. 🏗️ CORE CONFIGURATION & STYLING
+# 1. 🎨 PRO UI CONFIGURATION
 # ------------------------------------------------------
 st.set_page_config(
-    page_title="Kisan Farm OS",
+    page_title="Kisan Farm OS Pro",
     page_icon="🌱",
     layout="centered",
     initial_sidebar_state="collapsed"
 )
 
-# PROFESSIONAL MOBILE-FIRST CSS (Fixed for Dark/Light Mode)
-st.markdown("""
-    <style>
-    /* GLOBAL RESET: Force Light Mode feel */
-    .stApp { background-color: #f8f9fa; color: #000000 !important; }
-    
-    /* TEXT VISIBILITY FIXES */
-    h1, h2, h3, h4, h5, h6, p, li, span, div { color: #000000; }
-    label, .stTextInput label, .stSelectbox label { 
-        color: #31333F !important; 
-        font-weight: 600 !important;
-    }
-    
-    /* CARD COMPONENT */
-    .pro-card {
-        background-color: #ffffff !important;
-        padding: 25px;
-        border-radius: 16px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-        margin-bottom: 20px;
-        border: 1px solid #e0e0e0;
-    }
-    
-    /* BUTTON STYLING */
-    .stButton button {
-        background-color: #2E7D32 !important;
-        color: white !important;
-        border: none !important;
-        border-radius: 10px !important;
-        height: 55px !important;
-        font-size: 16px !important;
-        font-weight: 600 !important;
-        width: 100%;
-    }
-    .stButton button:hover {
-        background-color: #1B5E20 !important;
-        box-shadow: 0 4px 8px rgba(46, 125, 50, 0.3);
-    }
-    
-    /* HIDE STREAMLIT ELEMENTS */
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
-    </style>
-""", unsafe_allow_html=True)
-
-# ------------------------------------------------------
-# 2. 💾 DATABASE LAYER
-# ------------------------------------------------------
-# Connect to local SQLite DB to persist user data
-conn = sqlite3.connect('farm_data.db', check_same_thread=False)
-c = conn.cursor()
-
-# Create tables if they don't exist
-c.execute('''
-    CREATE TABLE IF NOT EXISTS users (
-        phone TEXT PRIMARY KEY, 
-        name TEXT, 
-        crop TEXT, 
-        region TEXT,
-        joined_date TEXT
-    )
-''')
-conn.commit()
-
-def register_or_login_user(phone, name, crop, region):
-    """Saves user to DB if new, or updates login time."""
-    try:
-        # Check if user exists
-        c.execute("SELECT * FROM users WHERE phone = ?", (phone,))
-        user = c.fetchone()
-        
-        if not user:
-            # Register new user
-            c.execute("INSERT INTO users VALUES (?, ?, ?, ?, ?)", 
-                      (phone, name, crop, region, str(dt.date.today())))
-            conn.commit()
-            return "registered"
-        else:
-            return "logged_in"
-    except Exception as e:
-        st.error(f"Database Error: {e}")
-        return None
-
-# ------------------------------------------------------
-# 3. 🔐 AUTHENTICATION LOGIC
-# ------------------------------------------------------
-def init_session():
-    if "authenticated" not in st.session_state: st.session_state.authenticated = False
-    if "user" not in st.session_state: st.session_state.user = {}
-    if "otp_stage" not in st.session_state: st.session_state.otp_stage = False
-    if "generated_otp" not in st.session_state: st.session_state.generated_otp = None
-
-def render_login():
-    """Renders the Login/Signup Screen"""
-    
-    # Header Image & Title
-    st.markdown("<br>", unsafe_allow_html=True)
-    c1, c2, c3 = st.columns([1, 2, 1])
-    with c2:
-        st.image("https://cdn-icons-png.flaticon.com/512/3025/3025528.png", width=100)
-    
-    st.markdown("""
-        <div style='text-align: center; margin-bottom: 30px;'>
-            <h1>Kisan Farm OS</h1>
-            <p style='color: #666;'>One-Stop Smart Farming Solution</p>
-        </div>
-    """, unsafe_allow_html=True)
-
-    # Login Card
-    st.markdown("<div class='pro-card'>", unsafe_allow_html=True)
-    
-    # STAGE 1: ENTER DETAILS
-    if not st.session_state.otp_stage:
-        st.markdown("### 👋 Let's get started")
-        
-        name = st.text_input("Full Name / पूरा नाम", "Ram Singh")
-        crop = st.selectbox("Select Main Crop / फसल", ["Wheat (Rabi)", "Rice (Kharif)", "Cotton", "Sugarcane", "Maize", "Mustard"])
-        region = st.selectbox("Select Region / क्षेत्र", ["Mohali, PB", "Ludhiana, PB", "Bathinda, PB", "Delhi, NCR", "Karnal, HR"])
-        phone = st.text_input("Mobile Number / मोबाइल नंबर", placeholder="9876543210", max_chars=10)
-        
-        if st.button("Get OTP 📩"):
-            if len(phone) == 10 and phone.isdigit():
-                with st.spinner("Connecting to secure server..."):
-                    time.sleep(1.2) # Simulate network delay
-                    # Generate OTP
-                    otp = random.randint(1000, 9999)
-                    st.session_state.generated_otp = otp
-                    st.session_state.otp_stage = True
-                    
-                    # Store temporary data
-                    st.session_state.temp_user = {
-                        "phone": phone, "name": name, 
-                        "crop": crop, "region": region
-                    }
-                    st.rerun()
-            else:
-                st.error("⚠️ Please enter a valid 10-digit mobile number.")
-
-    # STAGE 2: VERIFY OTP
-    else:
-        phone = st.session_state.temp_user['phone']
-        st.markdown(f"### 🔐 Verify Mobile")
-        st.info(f"OTP sent to **{phone}**")
-        
-        # DISPLAY OTP FOR DEMO (So you can log in easily)
-        st.success(f"**Your OTP is: {st.session_state.generated_otp}**")
-        
-        otp_input = st.text_input("Enter 4-digit OTP", max_chars=4, placeholder="XXXX")
-        
-        if st.button("Verify & Login 🚀"):
-            if str(otp_input) == str(st.session_state.generated_otp):
-                # Save to DB
-                status = register_or_login_user(
-                    phone, 
-                    st.session_state.temp_user['name'],
-                    st.session_state.temp_user['crop'],
-                    st.session_state.temp_user['region']
-                )
-                
-                # Update Session
-                st.session_state.user = st.session_state.temp_user
-                st.session_state.authenticated = True
-                st.balloons()
-                time.sleep(1)
-                st.rerun()
-            else:
-                st.error("❌ Incorrect OTP. Please try again.")
-        
-        if st.button("Edit Details"):
-            st.session_state.otp_stage = False
-            st.rerun()
-
-    st.markdown("</div>", unsafe_allow_html=True)
-# ------------------------------------------------------
-# 1. 🏗️ CORE CONFIGURATION & STYLING
-# ------------------------------------------------------
-st.set_page_config(
-    page_title="Kisan Farm OS",
-    page_icon="🌱",
-    layout="centered",
-    initial_sidebar_state="collapsed"
-)
-
-# PROFESSIONAL CSS (Added 'hero-card' for Weather)
+# 🛑 CSS FIX: FORCE BLACK TEXT EVERYWHERE
 st.markdown("""
     <style>
     /* GLOBAL RESET */
-    .stApp { background-color: #f8f9fa; color: #000000 !important; }
-    h1, h2, h3, h4, h5, h6, p, li, span, div { color: #000000; }
-    label, .stTextInput label, .stSelectbox label { color: #31333F !important; font-weight: 600; }
+    .stApp { background-color: #f8f9fa; color: black !important; }
     
-    /* STANDARD CARD */
-    .pro-card {
-        background-color: #ffffff !important;
-        padding: 25px;
-        border-radius: 16px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-        margin-bottom: 20px;
-        border: 1px solid #e0e0e0;
+    /* INPUT LABELS */
+    label, .stTextInput label, .stSelectbox label, .stDateInput label {
+        color: #31333F !important;
+        font-weight: 600 !important;
     }
     
-    /* NEW: WEATHER HERO CARD (Gradient) */
-    .hero-card {
+    /* CARD STYLING */
+    .pro-card {
+        background-color: white !important;
+        padding: 20px;
+        border-radius: 15px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        margin-bottom: 15px;
+        border: 1px solid #e0e0e0;
+        color: black !important;
+    }
+    .pro-card h3, .pro-card p, .pro-card b, .pro-card div { color: black !important; }
+    
+    /* HERO WEATHER CARD (Keep White Text) */
+    .weather-hero {
         background: linear-gradient(135deg, #2E7D32 0%, #4CAF50 100%);
         color: white !important;
         padding: 25px;
         border-radius: 20px;
         margin-bottom: 20px;
-        box-shadow: 0 8px 16px rgba(46, 125, 50, 0.25);
+        box-shadow: 0 10px 20px rgba(46, 125, 50, 0.3);
     }
-    /* Force white text inside Hero Card */
-    .hero-card h1, .hero-card h2, .hero-card p, .hero-card span { color: white !important; }
-    
-    /* STATUS PILL (Green/Red/Yellow badges) */
-    .status-pill {
-        background: rgba(255,255,255,0.2);
-        padding: 5px 12px;
-        border-radius: 20px;
-        font-weight: bold;
-        font-size: 0.9rem;
-        backdrop-filter: blur(5px);
-        color: white !important;
-    }
+    .weather-hero h1, .weather-hero h2, .weather-hero p { color: white !important; }
 
     /* BUTTONS */
     .stButton button {
-        background-color: #2E7D32 !important;
-        color: white !important;
-        border: none !important;
-        border-radius: 10px !important;
-        height: 55px !important;
-        font-weight: 600 !important;
-        width: 100%;
+        background-color: white !important;
+        color: black !important;
+        border: 1px solid #ddd !important;
+        border-radius: 12px !important;
+        height: 60px !important;
     }
-    .stButton button:hover { background-color: #1B5E20 !important; }
+    
+    /* SEARCH & ALERTS */
+    .search-header {
+        background: #2E7D32; padding: 20px; border-radius: 0 0 20px 20px;
+        color: white !important; text-align: center; margin-bottom: 20px;
+    }
+    .pill-red { background-color: #FF5252; padding: 5px 10px; border-radius: 10px; color: white !important; font-weight: bold; }
+    .pill-green { background-color: #4CAF50; padding: 5px 10px; border-radius: 10px; color: white !important; font-weight: bold; }
     
     /* HIDE DEFAULTS */
-    #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
+    #MainMenu, footer, header {visibility: hidden;}
     </style>
 """, unsafe_allow_html=True)
 
 # ------------------------------------------------------
-# 2. 💾 DATABASE LAYER (Same as Phase 1)
+# 2. 🧠 BACKEND LOGIC
 # ------------------------------------------------------
+CROP_DATABASE = [
+    {"name": "Wheat (Rabi)", "hindi": "गेहूं", "soil": "Loamy", "sowing": "Nov-Dec", "harvest": "Apr-May", "water": "Moderate", "diseases": ["Yellow Rust", "Loose Smut"], "varieties": ["PBW 343", "HD 2967"], "states": ["Punjab", "Haryana", "UP"]},
+    {"name": "Rice (Kharif)", "hindi": "धान", "soil": "Clayey", "sowing": "Jun-Jul", "harvest": "Oct-Nov", "water": "High", "diseases": ["Blast", "Blight"], "varieties": ["Basmati 1121", "PR 126"], "states": ["Punjab", "WB", "UP"]},
+    {"name": "Cotton", "hindi": "कपास", "soil": "Black Soil", "sowing": "Apr-May", "harvest": "Oct-Jan", "water": "Low", "diseases": ["Pink Bollworm"], "varieties": ["Bt Cotton"], "states": ["Gujarat", "Maharashtra"]},
+]
+CROP_INFO = {
+    "Wheat": {"duration": 140, "stages": [(0,20,"Germination"), (21,60,"Tillering"), (61,90,"Flowering"), (91,140,"Ripening")]},
+    "Rice": {"duration": 120, "stages": [(0,15,"Seedling"), (16,45,"Tillering"), (46,75,"Flowering"), (76,120,"Harvesting")]},
+    "Cotton": {"duration": 160, "stages": [(0,20,"Seedling"), (21,60,"Vegetative"), (61,100,"Flowering"), (101,160,"Picking")]}
+}
+CITY_COORDS = {"Mohali": (30.7, 76.7), "Ludhiana": (30.9, 75.8), "Delhi": (28.6, 77.2), "Bathinda": (30.2, 74.9)}
+
 conn = sqlite3.connect('farm_data.db', check_same_thread=False)
 c = conn.cursor()
-c.execute('''CREATE TABLE IF NOT EXISTS users (phone TEXT PRIMARY KEY, name TEXT, crop TEXT, region TEXT, joined_date TEXT)''')
+c.execute('''CREATE TABLE IF NOT EXISTS feedback (date TEXT, city TEXT, pred_rain REAL, actual_rain REAL, error REAL)''')
 conn.commit()
 
-def register_or_login_user(phone, name, crop, region):
+@st.cache_resource
+def load_resources():
     try:
-        c.execute("SELECT * FROM users WHERE phone = ?", (phone,))
-        if not c.fetchone():
-            c.execute("INSERT INTO users VALUES (?, ?, ?, ?, ?)", (phone, name, crop, region, str(dt.date.today())))
-            conn.commit()
-    except Exception as e: st.error(f"DB Error: {e}")
+        model = load_model("rainfall.h5")
+        f_scaler = joblib.load("feature_scaler.pkl")
+        t_scaler = joblib.load("target_scaler.pkl")
+        return model, f_scaler, t_scaler
+    except: return None, None, None
 
-# ------------------------------------------------------
-# 3. ☁️ WEATHER ENGINE (THE MISSING PART)
-# ------------------------------------------------------
-CITY_COORDS = {
-    "Mohali, PB": (30.7046, 76.7179),
-    "Ludhiana, PB": (30.9010, 75.8573),
-    "Bathinda, PB": (30.2109, 74.9455),
-    "Delhi, NCR": (28.6139, 77.2090),
-    "Karnal, HR": (29.6857, 76.9905),
-    "Uttar Pradesh": (26.8467, 80.9462) 
-}
+model, feature_scaler, target_scaler = load_resources()
 
-# Added Cache to make app faster (won't call API on every click)
-@st.cache_data(ttl=300) 
-def get_live_weather(city_name):
-    """Fetches real-time weather from Open-Meteo API."""
-    lat, lon = CITY_COORDS.get(city_name, (30.70, 76.71)) # Default Mohali
-    
-    # 1. Call API
-    url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true&hourly=rain,relative_humidity_2m,windspeed_10m"
-    
+def fetch_weather_and_predict(city):
+    if not model: return {"temp": 28, "rain": 0, "hum": 60, "wind": 10}, 0.0
+    lat, lon = CITY_COORDS.get(city, (30.7, 76.7))
+    url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true&hourly=rain,relative_humidity_2m,cloudcover,wind_speed_10m,temperature_2m&past_days=1&forecast_days=1"
     try:
         resp = requests.get(url).json()
-        current = resp['current_weather']
-        hourly = resp['hourly']
-        
-        # 2. Calculate Logic (Next 24h Rain)
-        now_index = int(pd.to_datetime(current['time']).hour)
-        rain_24h = sum(hourly['rain'][now_index : now_index+24])
-        
-        return {
-            "temp": current['temperature'],
-            "wind": current['windspeed'],
-            "rain_forecast": rain_24h, # Critical for Red/Green Light
-            "humidity": hourly['relative_humidity_2m'][now_index]
-        }
-    except Exception as e:
-        # Fallback if internet fails
-        return {"temp": "--", "wind": "--", "rain_forecast": 0.0, "humidity": "--"}
+        h = resp.get("hourly", {})
+        df = pd.DataFrame({
+            "time": pd.to_datetime(h["time"]),
+            "rain": h["rain"], "hum": h["relative_humidity_2m"],
+            "cloud": h["cloudcover"], "wind": h["wind_speed_10m"], "temp": h["temperature_2m"]
+        })
+        now = pd.Timestamp.now().floor('h')
+        idx = abs(df['time'] - now).idxmin()
+        def val(i, c): return df.loc[i, c] if i >= 0 else 0.0
+        features = [
+            val(idx-1, "rain"), val(idx-3, "rain"), val(idx-7, "rain"),
+            val(idx-1, "hum"), val(idx-1, "wind"), val(idx-1, "temp"),
+            df.loc[max(0, idx-2):idx, "rain"].mean(),
+            df.loc[max(0, idx-2):idx, "hum"].mean(),
+            df.loc[max(0, idx-2):idx, "cloud"].mean(),
+            dt.datetime.now().month, dt.datetime.now().weekday()
+        ]
+        X = feature_scaler.transform(np.array(features).reshape(1, -1)).reshape(1, 1, 11)
+        if model.input_shape[-1] == 1: X = X[:, :, 0:1]
+        pred = max(0.0, float(target_scaler.inverse_transform(model.predict(X))[0][0]))
+        return {"temp": df.loc[idx, "temp"], "hum": df.loc[idx, "hum"], "wind": df.loc[idx, "wind"], "rain": float(f"{pred:.1f}")}, pred
+    except: return {"temp": 25, "rain": 0, "hum": 50, "wind": 5}, 0.0
+
+def text_to_speech(text):
+    if not VOICE_ENABLED: return
+    try:
+        tts = gTTS(text=text, lang='en')
+        tts.save("audio.mp3")
+        st.audio("audio.mp3", format="audio/mp3", start_time=0)
+    except: pass
+
+def get_bot_response(msg, rain, crop):
+    msg = msg.lower()
+    if "price" in msg: return f"{crop} price is stable at ₹2200/Q."
+    if "spray" in msg: return "Don't spray, rain expected." if rain > 1 else "Safe to spray."
+    return f"I can help with {crop} weather and prices."
 
 # ------------------------------------------------------
-# 4. 📱 APP SCREENS
+# 3. 📱 APP NAVIGATION & LOGIN
 # ------------------------------------------------------
-def init_session():
-    if "authenticated" not in st.session_state: st.session_state.authenticated = False
-    if "user" not in st.session_state: st.session_state.user = {}
-    if "otp_stage" not in st.session_state: st.session_state.otp_stage = False
-    if "generated_otp" not in st.session_state: st.session_state.generated_otp = None
-    if "temp_user" not in st.session_state: st.session_state.temp_user = {}
+if "authenticated" not in st.session_state: st.session_state.authenticated = False
+if "page" not in st.session_state: st.session_state.page = "home"
+if "user_data" not in st.session_state: st.session_state.user_data = {}
 
-def render_login():
-    """Phase 1 Login Screen"""
-    st.markdown("<br>", unsafe_allow_html=True)
-    c1, c2, c3 = st.columns([1, 2, 1])
-    with c2: st.image("https://cdn-icons-png.flaticon.com/512/3025/3025528.png", width=100)
+# === LOGIN SCREEN ===
+# ================= LOGIN SCREEN (Fixed) =================
+if not st.session_state.authenticated:
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    st.image("https://cdn-icons-png.flaticon.com/512/3025/3025528.png", width=100)
+    st.title("Kisan Farm OS")
     
-    st.markdown("<h1 style='text-align: center;'>Kisan Farm OS</h1>", unsafe_allow_html=True)
-    st.markdown("<div class='pro-card'>", unsafe_allow_html=True)
+    if "otp_sent" not in st.session_state: st.session_state.otp_sent = False
     
-    if not st.session_state.otp_stage:
-        st.markdown("### 👋 Login")
-        name = st.text_input("Name", "Ram Singh")
-        crop = st.selectbox("Crop", ["Rice (Kharif)", "Wheat (Rabi)", "Cotton", "Sugarcane"])
-        region = st.selectbox("Region", list(CITY_COORDS.keys()))
-        phone = st.text_input("Mobile", placeholder="9876543210")
+    with st.container():
+        st.markdown("<div class='pro-card'>", unsafe_allow_html=True)
         
-        if st.button("Get OTP"):
-            if len(phone)==10:
-                st.session_state.generated_otp = random.randint(1000,9999)
-                st.session_state.otp_stage = True
-                st.session_state.temp_user = {"phone":phone, "name":name, "crop":crop, "region":region}
+        # BLOCK 1: INPUT DETAILS
+        if not st.session_state.otp_sent:
+            name = st.text_input("Full Name", "Ram Singh")
+            crop = st.selectbox("Crop", list(CROP_INFO.keys()))
+            city = st.selectbox("City", list(CITY_COORDS.keys()))
+            sowing = st.date_input("Sowing Date", dt.date.today()-dt.timedelta(days=40))
+            
+            # Save phone input to a variable
+            input_phone = st.text_input("Mobile", "9876543210")
+            
+            if st.button("Get OTP", type="primary", use_container_width=True):
+                # 1. Save data to Session State so it persists after rerun
+                st.session_state.otp = random.randint(1000,9999)
+                st.session_state.temp = {"name":name, "crop":crop, "city":city, "sowing":sowing}
+                st.session_state.phone_number = input_phone  # <--- FIXED HERE
+                st.session_state.otp_sent = True
                 st.rerun()
-            else: st.error("Invalid Number")
-    else:
-        # Phase 1: OTP Simulation
-        st.success(f"**OTP: {st.session_state.generated_otp}**")
-        otp = st.text_input("Enter OTP", max_chars=4)
-        if st.button("Login"):
-            if str(otp) == str(st.session_state.generated_otp):
-                register_or_login_user(st.session_state.temp_user['phone'], st.session_state.temp_user['name'], st.session_state.temp_user['crop'], st.session_state.temp_user['region'])
-                st.session_state.user = st.session_state.temp_user
-                st.session_state.authenticated = True
+        
+        # BLOCK 2: VERIFY OTP
+        else:
+            # 2. Retrieve phone from Session State
+            saved_phone = st.session_state.get("phone_number", "your number")
+            
+            st.success(f"✅ SMS Sent to {saved_phone}: **{st.session_state.otp}**")
+            st.info("Use the code above to login.")
+            
+            u_otp = st.text_input("Enter OTP", max_chars=4)
+            if st.button("Verify Login", type="primary", use_container_width=True):
+                if str(u_otp) == str(st.session_state.otp):
+                    st.session_state.user_data = st.session_state.temp
+                    st.session_state.authenticated = True
+                    st.rerun()
+                else: st.error("Wrong OTP")
+            
+            if st.button("Resend"):
+                st.session_state.otp_sent = False
                 st.rerun()
-            else: st.error("Wrong OTP")
-    st.markdown("</div>", unsafe_allow_html=True)
+                
+        st.markdown("</div>", unsafe_allow_html=True)
+# === MAIN DASHBOARD ===
+else:
+    data = st.session_state.user_data
+    w, pred_rain = fetch_weather_and_predict(data['city'])
 
-def render_dashboard():
-    """Phase 2: Real-Time Weather Dashboard"""
-    user = st.session_state.user
-    
-    # 1. HEADER
-    c1, c2 = st.columns([3, 1])
-    with c1: 
-        st.markdown(f"### 👋 Namaste, {user['name'].split()[0]}")
-        st.caption(f"📍 {user['region']} • 🌾 {user['crop']}")
-    with c2:
-        if st.button("🚪"):
-            st.session_state.authenticated = False
-            st.session_state.otp_stage = False
-            st.rerun()
+    if st.session_state.page == "home":
+        c1, c2 = st.columns([4, 1])
+        with c1: st.markdown(f"### 👋 Namaste, {data['name']}")
+        with c2: 
+            if st.button("🚪"): st.session_state.authenticated = False; st.rerun()
 
-    # 2. FETCH LIVE DATA (The Brain)
-    with st.spinner("Connecting to Satellite..."):
-        w = get_live_weather(user['region'])
-    
-    # 3. TRAFFIC LIGHT LOGIC (The Problem Solver)
-    # If rain > 5mm in next 24h -> RED ALERT
-    if isinstance(w['rain_forecast'], (int, float)) and w['rain_forecast'] > 5.0:
-        theme_color = "linear-gradient(135deg, #DC2626 0%, #991B1B 100%)" # Red
-        status_text = "🚫 STOP WORK"
-        advisory = f"Heavy rain ({w['rain_forecast']:.1f}mm) expected. Do not spray pesticides."
-    elif isinstance(w['rain_forecast'], (int, float)) and w['rain_forecast'] > 1.0:
-        theme_color = "linear-gradient(135deg, #F59E0B 0%, #D97706 100%)" # Yellow
-        status_text = "⚠️ CAUTION"
-        advisory = f"Light drizzle ({w['rain_forecast']:.1f}mm) likely. Hold irrigation."
-    else:
-        theme_color = "linear-gradient(135deg, #2E7D32 0%, #4CAF50 100%)" # Green
-        status_text = "🟢 GO AHEAD"
-        advisory = "Weather is clear. Safe for irrigation & spraying."
-
-    # 4. RENDER HERO CARD
-    st.markdown(f"""
-    <div class="hero-card" style="background: {theme_color};">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 10px;">
-            <span class="status-pill">{status_text}</span>
-            <span>{dt.datetime.now().strftime('%d %b, %I:%M %p')}</span>
-        </div>
-        <div style="display:flex; align-items:flex-end; gap:15px;">
-            <h1 style="margin:0; font-size:3.5rem;">{w['temp']}°C</h1>
-            <div style="margin-bottom:10px;">
-                <p style="margin:0;">🌧️ {w['rain_forecast']}mm Rain</p>
-                <p style="margin:0;">💧 {w['humidity']}% Hum</p>
+        status = "STOP WORK" if w['rain'] > 5 else "SAFE TO WORK"
+        color = "pill-red" if w['rain'] > 5 else "pill-green"
+        st.markdown(f"""
+        <div class="weather-hero">
+            <div style="display:flex; justify-content:space-between;">
+                <span class="{color}">{status}</span>
+                <span>{dt.datetime.now().strftime('%d %b')}</span>
             </div>
+            <h1>{w['temp']}°C</h1>
+            <p>🌧️ {w['rain']}mm | 💧 {w['hum']}% | 💨 {w['wind']}km/h</p>
         </div>
-        <hr style="border-color: rgba(255,255,255,0.3);">
-        <p style="font-weight: 500; font-size: 1.1rem;">📢 {advisory}</p>
-    </div>
-    """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
+        if st.button("🔊 Listen"): text_to_speech(f"Temperature is {w['temp']} degrees. {status}")
 
-    # 5. PHASE 3 & 4 PLACEHOLDERS
-    st.markdown("### 🚜 Quick Actions")
-    c1, c2 = st.columns(2)
-    with c1:
-        st.info("🏥 Plant Doctor\n\n(Coming Phase 3)")
-    with c2:
-        st.success("💰 Mandi Prices\n\n(Coming Phase 4)")
+        st.markdown("### 🚜 Actions")
+        c1, c2, c3, c4 = st.columns(4)
+        with c1: 
+            if st.button("🔍\nSearch"): st.session_state.page = "search"; st.rerun()
+        with c2: 
+            if st.button("🏥\nDoctor"): st.session_state.page = "doctor"; st.rerun()
+        with c3: 
+            if st.button("💰\nMandi"): st.session_state.page = "mandi"; st.rerun()
+        with c4: 
+            if st.button("🤖\nChat"): st.session_state.page = "chat"; st.rerun()
 
- ------------------------------------------------------
-# PHASE 4: MONEY MODULE (Mandi Prices)
-# ------------------------------------------------------
-def render_mandi():
-    """Displays Real-Time Market Prices & Comparisons"""
-    if "user" not in st.session_state or not st.session_state.user:
-        st.session_state.page = "login"
-        st.rerun()
-        
-    user_crop = st.session_state.user.get('crop', 'Wheat')
-    user_city = st.session_state.user.get('region', 'Local')
-    
-    st.markdown(f"### 💰 Market Rates: {user_crop}")
-    
-    # 1. Base Price Logic (Simulated Real-Time)
-    price_map = {
-        "Wheat (Rabi)": 2275,
-        "Rice (Kharif)": 3100,
-        "Cotton": 6600,
-        "Sugarcane": 340,
-        "Maize": 2090,
-        "Mustard": 5650
-    }
-    base_price = price_map.get(user_crop, 2000)
-    
-    # Add daily fluctuation
-    fluctuation = random.randint(-50, 100)
-    current_price = base_price + fluctuation
-    
-    # Visual Logic
-    trend_symbol = "📈 UP" if fluctuation > 0 else "📉 DOWN"
-    trend_color = "#166534" if fluctuation > 0 else "#991b1b" # Green or Red
-    
-    # 2. Local Market Card
-    st.markdown(f"""
-    <div class='pro-card' style='border-left: 5px solid {trend_color};'>
-        <p style='margin:0; color:gray;'>📍 {user_city} APMC (Local)</p>
-        <h1 style='color: {trend_color}; margin: 5px 0;'>₹{current_price} / Q</h1>
-        <p style='color: #333; margin: 0; font-weight:500;'><b>Trend:</b> {trend_symbol} by ₹{abs(fluctuation)} today</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # 3. Comparison Table (Arbitrage Opportunity)
-    st.markdown("### 🚛 Nearby Markets")
-    st.write("Compare rates to sell profitably:")
-    
-    nearby_mandis = [
-        ("District Main", current_price + random.randint(20, 60), "25km"),
-        ("Private Trader", current_price - random.randint(10, 30), "Doorstep"),
-        ("Neighbor District", current_price + random.randint(10, 40), "45km")
-    ]
-    
-    st.markdown("<div class='pro-card'>", unsafe_allow_html=True)
-    
-    # Header Row
-    c1, c2, c3 = st.columns([2, 1, 1])
-    c1.markdown("**Mandi**")
-    c2.markdown("**Price**")
-    c3.markdown("**Dist**")
-    st.markdown("<hr style='margin: 5px 0;'>", unsafe_allow_html=True)
-    
-    # Data Rows
-    for name, price, dist in nearby_mandis:
-        c1, c2, c3 = st.columns([2, 1, 1])
-        c1.write(name)
-        
-        # Color code price difference
-        diff = price - current_price
-        diff_color = "green" if diff > 0 else "red"
-        diff_text = f"+₹{diff}" if diff > 0 else f"-₹{abs(diff)}"
-        
-        c2.markdown(f"**₹{price}** <span style='color:{diff_color}; font-size:0.8rem;'>{diff_text}</span>", unsafe_allow_html=True)
-        c3.caption(dist)
-        st.markdown("<hr style='margin: 5px 0; border-top: 1px dashed #eee;'>", unsafe_allow_html=True)
-        
-    st.success("💡 **Tip:** Selling at 'District Main' covers transport cost and gives ₹200 extra profit per trolley.")
-    st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown("### 📢 Alerts")
+        st.markdown(f"""<div class='pro-card'>📢 <b>Mandi Update:</b> {data['crop']} prices are up by ₹40 today.</div>""", unsafe_allow_html=True)
 
-    if st.button("⬅️ Back to Home"):
-        st.session_state.page = "dashboard"
-        st.rerun()
-```
+    elif st.session_state.page == "search":
+        if st.button("← Back"): st.session_state.page = "home"; st.rerun()
+        st.markdown("<div class='search-header'><h1>🔍 Kisan Gyan</h1><p>Search Crops & Diseases</p></div>", unsafe_allow_html=True)
+        q = st.text_input("Search...", "")
+        if q:
+            found = [x for x in CROP_DATABASE if q.lower() in str(x).lower()]
+            if found:
+                for f in found:
+                    with st.expander(f"🌾 {f['name']} ({f['hindi']})", expanded=True):
+                        st.write(f"**Soil:** {f['soil']} | **Water:** {f['water']}")
+                        st.write(f"**Diseases:** {', '.join(f['diseases'])}")
+            else: st.info("No results found.")
 
-#### **Part 2: Update the Dashboard Button**
-Go to your `render_dashboard` function. Find the `c2` column (bottom right) and update it to enable the button.
+    elif st.session_state.page == "doctor":
+        if st.button("← Back"): st.session_state.page = "home"; st.rerun()
+        st.title("🏥 Plant Doctor")
+        st.markdown("<div class='pro-card'>", unsafe_allow_html=True)
+        st.write("Upload Leaf Photo")
+        img = st.file_uploader(" ", label_visibility="collapsed")
+        if img:
+            st.image(img, width=200)
+            st.success("Detected: Yellow Rust")
+            st.info("Spray Propiconazole")
+        st.markdown("</div>", unsafe_allow_html=True)
 
-```python
-    # Inside render_dashboard...
-    with c2:
-        if st.button("💰 Mandi Prices"):
-            st.session_state.page = "mandi"
-            st.rerun()
+    elif st.session_state.page == "mandi":
+        if st.button("← Back"): st.session_state.page = "home"; st.rerun()
+        st.title("💰 Market Rates")
+        base = 2200 if data['crop'] == "Wheat" else 3000
+        st.markdown(f"""
+        <div class="pro-card" style="display:flex; justify-content:space-between;">
+            <div><b>Local Mandi</b><br><span style="color:grey;">2km away</span></div>
+            <div style="text-align:right; color:#2E7D32;"><b>₹{base}</b><br>Stable</div>
+        </div>
+        <div class="pro-card" style="display:flex; justify-content:space-between;">
+            <div><b>District APMC</b><br><span style="color:grey;">15km away</span></div>
+            <div style="text-align:right; color:#2E7D32;"><b>₹{base+50}</b><br>⬆️ High</div>
+        </div>
+        """, unsafe_allow_html=True)
 
-# ------------------------------------------------------
-# 5. 🚀 EXECUTION
-# ------------------------------------------------------
-if __name__ == "__main__":
-    init_session()
-    
-    if not st.session_state.authenticated:
-        render_login()
-    elif st.session_state.page == "dashboard":
-        render_dashboard()
-    elif st.session_state.page == "plant_doctor":
-        render_plant_doctor()
-    elif st.session_state.page == "mandi":   # <--- ADD THIS
-        render_mandi()                       # <--- ADD THIS
+    elif st.session_state.page == "chat":
+        if st.button("← Back"): st.session_state.page = "home"; st.rerun()
+        st.title("🤖 Assistant")
+        if "messages" not in st.session_state: st.session_state.messages = []
+        for msg in st.session_state.messages: st.chat_message(msg["role"]).write(msg["content"])
+        if prompt := st.chat_input("Ask..."):
+            st.chat_message("user").write(prompt)
+            st.session_state.messages.append({"role": "user", "content": prompt})
+            resp = get_bot_response(prompt, pred_rain, data['crop'])
+            st.chat_message("assistant").write(resp)
+            st.session_state.messages.append({"role": "assistant", "content": resp})
